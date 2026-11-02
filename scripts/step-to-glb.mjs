@@ -7,15 +7,17 @@
 // estoura esse limite e as peças voltam sem malha. O script mantém a estrutura da montagem (posições) e
 // separa a geometria em lotes de sólidos; cada lote vira um STEP pequeno, lido por uma instância nova.
 //
-// Uso: node --max-old-space-size=8192 scripts/step-to-glb.mjs entrada.step saida.glb [--batch 8] [--min-size 20] [--deflection 3] [--angular 1.2]
+// Uso: node --max-old-space-size=8192 scripts/step-to-glb.mjs entrada.step saida.glb [--batch 8] [--min-size 20] [--deflection 3] [--angular 1.2] [--triangles 250000]
 //   --batch     sólidos por lote (padrão 8)
 //   --min-size  descarta peças menores que isto em mm na maior dimensão (parafusos, porcas, espaçadores); padrão 20
 //   --deflection  erro máximo da malha em mm (maior = arquivo mais leve); padrão 3
 //   --angular   desvio angular máximo da malha em radianos; padrão 1.2
+//   --triangles meta de triângulos após a simplificação (meshoptimizer); padrão 250000
 // Os padrões miram um modelo leve para o jogo (algumas centenas de milhares de triângulos), não para fabricação.
 // Um sólido que o OpenCascade não consegue triangular esvazia o lote inteiro: lotes menores perdem menos peças.
 import { readFileSync, writeFileSync } from "node:fs";
 import occtimportjs from "occt-import-js";
+import { simplifyGroups, triangleCount, writeGlb } from "./lib/glb.mjs";
 
 const args = process.argv.slice(2);
 const [input, output] = args.filter((a, i) => !a.startsWith("--") && !args[i - 1]?.startsWith("--"));
@@ -27,8 +29,9 @@ const BATCH = option("batch", 8);
 const MIN_SIZE_MM = option("min-size", 20);
 const DEFLECTION_MM = option("deflection", 3);
 const ANGULAR = option("angular", 1.2);
+const TRIANGLES = option("triangles", 250000);
 if (!input || !output) {
-  console.error("uso: node scripts/step-to-glb.mjs entrada.step saida.glb [--batch 8] [--min-size 20] [--deflection 3] [--angular 1.2]");
+  console.error("uso: node scripts/step-to-glb.mjs entrada.step saida.glb [--batch 8] [--min-size 20] [--deflection 3] [--angular 1.2] [--triangles 250000]");
   process.exit(1);
 }
 
@@ -225,74 +228,20 @@ for (let b = 0; b < solids.length; b += BATCH) {
   console.log(`  lote ${b / BATCH + 1}/${Math.ceil(solids.length / BATCH)}: ${result.meshes.length} malhas (${empty} vazias) · ${((Date.now() - t0) / 1000).toFixed(0)} s`);
 }
 
-// ---------- GLB (glTF 2.0 binário), em metros ----------
+// ---------- GLB (glTF 2.0 binário), em metros, simplificado para o jogo ----------
 const MM = 0.001;
-const meshes = [];
-const accessors = [];
-const bufferViews = [];
-const materials = [];
-const chunks = [];
-let offset = 0;
-const pushView = (typed, target) => {
-  const bytes = new Uint8Array(typed.buffer, typed.byteOffset, typed.byteLength);
-  const pad = (4 - (bytes.byteLength % 4)) % 4;
-  bufferViews.push({ buffer: 0, byteOffset: offset, byteLength: bytes.byteLength, target });
-  chunks.push(bytes, new Uint8Array(pad));
-  offset += bytes.byteLength + pad;
-  return bufferViews.length - 1;
-};
-let triangles = 0;
-for (const g of groups.values()) {
-  const pos = new Float32Array(g.positions.map((v) => v * MM));
-  const nor = new Float32Array(g.normals);
-  const idx = new Uint32Array(g.indices);
-  triangles += idx.length / 3;
-  const mn = [Infinity, Infinity, Infinity];
-  const mx = [-Infinity, -Infinity, -Infinity];
-  for (let i = 0; i < pos.length; i += 3) for (let k = 0; k < 3; k++) { mn[k] = Math.min(mn[k], pos[i + k]); mx[k] = Math.max(mx[k], pos[i + k]); }
-  accessors.push({ bufferView: pushView(pos, 34962), componentType: 5126, count: pos.length / 3, type: "VEC3", min: mn, max: mx });
-  accessors.push({ bufferView: pushView(nor, 34962), componentType: 5126, count: nor.length / 3, type: "VEC3" });
-  accessors.push({ bufferView: pushView(idx, 34963), componentType: 5125, count: idx.length, type: "SCALAR" });
-  materials.push({ pbrMetallicRoughness: { baseColorFactor: [...g.color, 1], metallicFactor: 0.2, roughnessFactor: 0.6 }, doubleSided: true });
-  meshes.push({ primitives: [{ attributes: { POSITION: accessors.length - 3, NORMAL: accessors.length - 2 }, indices: accessors.length - 1, material: materials.length - 1 }] });
-}
+const raw = [...groups.values()].map((g) => ({
+  color: g.color,
+  positions: new Float32Array(g.positions.map((v) => v * MM)),
+  normals: new Float32Array(g.normals),
+  indices: new Uint32Array(g.indices),
+}));
+const before = triangleCount(raw);
+const simplified = await simplifyGroups(raw, TRIANGLES);
 const size = box.min.map((v, k) => box.max[k] - v);
-const gltf = {
-  asset: { version: "2.0", generator: "Buzz Simulator step-to-glb" },
-  scene: 0,
-  scenes: [{ nodes: meshes.map((_, i) => i) }],
-  nodes: meshes.map((_, i) => ({ mesh: i })),
-  meshes,
-  materials,
-  accessors,
-  bufferViews,
-  buffers: [{ byteLength: offset }],
-  extras: { source: input.split(/[\\/]/).pop(), sizeMm: size.map((v) => +v.toFixed(1)) },
-};
-const json = new TextEncoder().encode(JSON.stringify(gltf));
-const jsonPad = (4 - (json.byteLength % 4)) % 4;
-const bin = new Uint8Array(offset);
-let o = 0;
-for (const c of chunks) {
-  bin.set(c, o);
-  o += c.byteLength;
-}
-const total = 12 + 8 + json.byteLength + jsonPad + 8 + bin.byteLength;
-const out = new Uint8Array(total);
-const view = new DataView(out.buffer);
-view.setUint32(0, 0x46546c67, true); // "glTF"
-view.setUint32(4, 2, true);
-view.setUint32(8, total, true);
-view.setUint32(12, json.byteLength + jsonPad, true);
-view.setUint32(16, 0x4e4f534a, true); // "JSON"
-out.set(json, 20);
-out.fill(0x20, 20 + json.byteLength, 20 + json.byteLength + jsonPad);
-const binStart = 20 + json.byteLength + jsonPad;
-view.setUint32(binStart, bin.byteLength, true);
-view.setUint32(binStart + 4, 0x004e4942, true); // "BIN"
-out.set(bin, binStart + 8);
+const out = writeGlb(simplified, { source: input.split(/[\\/]/).pop(), sizeMm: size.map((v) => +v.toFixed(1)) });
 writeFileSync(output, out);
 
 const inch = size.map((v) => (v / 25.4).toFixed(2));
-console.log(`${output}: ${kept} peças (${skippedSmall} pequenas descartadas), ${groups.size} cores, ${triangles} triângulos, ${(total / 1e6).toFixed(1)} MB`);
+console.log(`${output}: ${kept} peças (${skippedSmall} pequenas descartadas), ${groups.size} cores, ${before} → ${triangleCount(simplified)} triângulos, ${(out.byteLength / 1e6).toFixed(1)} MB`);
 console.log(`caixa: ${size.map((v) => v.toFixed(1)).join(" × ")} mm = ${inch.join(" × ")} pol (eixos do CAD)`);
