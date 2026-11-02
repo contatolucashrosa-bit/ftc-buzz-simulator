@@ -1,0 +1,175 @@
+{
+  "$schema": "./rules.schema.json",
+  "_comment": "Buzz Simulator — rascunho da Fase 1. Criado por Lucas Hochmann Rosa (https://github.com/contatolucashrosa-bit) em parceria com WestSharksFTC #24823. Fonte da verdade: BIOBUZZ Competition Manual, versão TU07. Chaves em inglês (contrato de dados); descrições em português. Campos com \"source\" citam seção/página do manual. Campos com \"assumption\": true NÃO estão no manual e devem ser confirmados.",
+  "meta": {
+    "game": "BIOBUZZ",
+    "season": "2026-2027",
+    "manualVersion": "TU07",
+    "units": { "length": "in", "time": "s" },
+    "coordinateSystem": "Origem no centro do campo; +x aponta para a aliança azul (direita de quem olha da plateia); +y aponta para o lado oposto à plateia; +z para cima."
+  },
+  "field": {
+    "size": { "x": 144, "y": 144, "source": "§9.2, p.62" },
+    "tiles": { "count": 36, "size": 24, "columns": ["A", "B", "C", "D", "E", "F"], "rows": [1, 2, 3, 4, 5, 6], "source": "§9.2 p.62; §9.4 p.65" },
+    "tolerance": { "value": 1, "source": "§9.1, p.61" },
+    "allianceSides": {
+      "red": { "columns": ["A", "B", "C"], "xRange": [-72, 0] },
+      "blue": { "columns": ["D", "E", "F"], "xRange": [0, 72] },
+      "source": "G304.A p.102; G402 p.104"
+    },
+    "allianceAreas": {
+      "size": { "width": 97, "depth": 54 },
+      "redSide": "left-from-audience",
+      "source": "§9.3 p.63; §9.5 p.66"
+    },
+    "zones": {
+      "loadingZone": {
+        "size": { "width": 23, "depth": 11 },
+        "red": { "xRange": [-72, -61], "yRange": [24, 47], "assumption": true, "note": "Posição estimada pelas Figuras 9-2 e 9-5; confirmar no CAD oficial." },
+        "blue": { "xRange": [61, 72], "yRange": [-47, -24], "assumption": true },
+        "source": "§9.3 p.63"
+      },
+      "garden": {
+        "size": { "length": 23, "width": 2 },
+        "red": { "xRange": [-72, -49], "yRange": [-72, -70], "assumption": true, "note": "Canto da plateia junto à aliança vermelha (Figura 9-2)." },
+        "blue": { "xRange": [49, 72], "yRange": [70, 72], "assumption": true },
+        "source": "§9.3 p.64"
+      }
+    },
+    "hiveStructure": {
+      "frame": { "width": 49.46, "depth": 38.95, "pivotHeight": 43.95, "source": "§9.6.1 p.67" },
+      "hives": {
+        "red": { "centerX": -12, "assumption": true },
+        "blue": { "centerX": 12, "assumption": true }
+      },
+      "cellSpacing": { "value": 18.8, "source": "§9.6.2 p.68" },
+      "cellOpening": { "width": 20, "height": 14, "depth": 12, "source": "§9.6.2 p.68" },
+      "initialState": "A CELL que 'aponta' para uma FLOWER começa virada para baixo (§10.3.1 p.81).",
+      "tipThreshold": {
+        "assumption": true,
+        "model": "torque",
+        "note": "O manual NÃO informa quantos elementos causam o TIP (§8 p.60: 'enough SCORING ELEMENTS'). Simulado por torque/massa; valores padrão a calibrar com o CAD/testes."
+      }
+    },
+    "flowers": {
+      "count": 4,
+      "topOpeningDiameter": 4,
+      "topOpeningHeight": 21.5,
+      "backstopHeight": 1.25,
+      "retrievalOpening": { "height": 3.55, "depth": 3.57 },
+      "lowerRingHoleDiameter": 2.79,
+      "positions": [
+        { "id": "scoringFlower", "label": "Scoring FLOWER", "wall": "rear", "x": -24, "y": 72 },
+        { "id": "audienceFlower", "label": "Audience FLOWER", "wall": "audience", "x": 24, "y": -72 },
+        { "id": "redAllianceFlower", "label": "Red ALLIANCE FLOWER", "wall": "left", "x": -72, "y": -24 },
+        { "id": "blueAllianceFlower", "label": "Blue ALLIANCE FLOWER", "wall": "right", "x": 72, "y": 24 }
+      ],
+      "positionsAssumption": true,
+      "source": "§9.7 p.70; posições estimadas da Figura 9-5 p.65 (confirmar no CAD oficial); nomes da calculadora oficial BIOBUZZ. A associação 'Scoring FLOWER' = parede do fundo é suposição."
+    },
+    "aprilTags": {
+      "family": "36h11",
+      "size": 3.25,
+      "clusters": [
+        { "cell": "red-rear", "ids": [30, 31, 32, 33] },
+        { "cell": "red-audience", "ids": [34, 35, 36, 37] },
+        { "cell": "blue-audience", "ids": [38, 39, 40, 41] },
+        { "cell": "blue-rear", "ids": [42, 43, 44, 45] }
+      ],
+      "mounting": "Face inferior de cada CELL, voltada para os TILES.",
+      "source": "§9.9 p.72-74"
+    }
+  },
+  "elements": {
+    "pollen": { "count": 40, "diameter": 2.8, "color": "yellow", "source": "§9.8 p.72" },
+    "nectar": { "countPerAlliance": 8, "diameter": 3.6, "colors": ["red", "blue"], "source": "§9.8 p.72" },
+    "staging": {
+      "pollen": { "perFlower": 4, "perGarden": 4, "preloadPerRobot": 4, "source": "§10.3.1 p.81" },
+      "nectar": { "inUpwardCell": 3, "inAllianceArea": 5, "source": "§10.3.1 p.82" },
+      "noShowPreload": "POLLEN de robô ausente vai ao centro da LOADING ZONE, contra a parede (§10.3.1 p.81)."
+    },
+    "massGrams": {
+      "pollen": null,
+      "nectar": null,
+      "assumption": true,
+      "note": "Massa não consta no manual. Preencher com medição real dos elementos AndyMark."
+    }
+  },
+  "match": {
+    "periods": [
+      { "id": "auto", "duration": 30, "clockStart": "2:30", "source": "§10.4 p.83" },
+      { "id": "transition", "duration": 8, "source": "§10.4 p.83; Tabela 9-1 p.77" },
+      { "id": "teleop", "duration": 120, "clockStart": "2:00", "source": "§10.4 p.83" }
+    ],
+    "milestones": [
+      { "id": "flowerUnlock", "clock": 60, "description": "NECTAR pode entrar nas FLOWERS; todo NECTAR restante pode ser introduzido.", "source": "G410 p.107; G426 p.114; Tabela 9-1" },
+      { "id": "finalCountdown", "clock": 20, "source": "Tabela 9-1 p.77" }
+    ],
+    "audioCues": "Tabela 9-1 p.77 (sons recriados, não copiados)."
+  },
+  "scoring": {
+    "source": "Tabela 10-2 p.89; critérios §10.5 p.84-88",
+    "items": [
+      { "id": "leave", "auto": 3, "teleop": null, "assessedAt": "endOfAuto", "rule": "Robô deixa de tocar a parede do perímetro." },
+      { "id": "park", "auto": 5, "teleop": 5, "assessedAt": ["endOfAuto", "endOfMatch"], "rule": "Robô ao menos parcialmente na LOADING ZONE da própria aliança." },
+      { "id": "hiveTip", "auto": 20, "teleop": 20, "assessedAt": "continuous", "rule": "TIP concluído antes do início do TELEOP conta como AUTO (§10.5.B)." },
+      { "id": "cellRemaining", "auto": null, "teleop": 2, "per": "element", "assessedAt": "endOfMatch", "rule": "POLLEN/NECTAR (de qualquer cor) na CELL virada para cima da HIVE da aliança. A calculadora oficial usa um contador único por aliança." },
+      { "id": "bottomNectarBonus", "auto": null, "teleop": 5, "per": "flower", "assessedAt": "endOfMatch", "rule": "Por FLOWER: o NECTAR mais baixo (primeiro NECTAR da pilha, ignorando POLLEN) é da cor da aliança. Confirmado pela calculadora oficial." },
+      { "id": "ownedFlowerElement", "auto": null, "teleop": 2, "per": "element", "assessedAt": "endOfMatch", "rule": "Dona da FLOWER = NECTAR mais alto da pilha; pontua 2 × todos os elementos no volume (POLLEN e NECTAR de qualquer cor). Confirmado pela calculadora oficial." },
+      { "id": "garden", "auto": null, "teleop": 1, "per": "element", "assessedAt": "endOfMatch", "rule": "Elemento ao menos parcialmente no GARDEN; pontua para a cor do GARDEN." }
+    ],
+    "rankingPoints": [
+      { "id": "swarm", "rp": 1, "metric": "leavePlusParkPoints", "threshold": 16, "note": "Soma LEAVE (AUTO) + PARK (AUTO) + PARK (fim), como na calculadora oficial." },
+      { "id": "pollinator1", "rp": 1, "metric": "hiveTips", "threshold": 4 },
+      { "id": "pollinator2", "rp": 1, "metric": "hiveTips", "threshold": 7 },
+      { "id": "win", "rp": 3 },
+      { "id": "tie", "rp": 1 }
+    ],
+    "rpThresholdsNote": "Limiares de 'All Other Events'. Regionais e Mundial: TBA (Tabela 10-3 p.89)."
+  },
+  "humanPlayer": {
+    "nectarEntry": {
+      "perOwnHiveTip": 1,
+      "allRemainingAtClock": 60,
+      "via": "loadingZone",
+      "source": "§10.1 p.79; G426 p.114; G427 p.115"
+    }
+  },
+  "penalties": {
+    "values": { "minor": 5, "major": 20, "creditedTo": "opponent", "source": "Tabela 10-4 p.90" },
+    "automatable": [
+      { "rule": "G402", "penalty": "major", "per": "match", "trigger": "Controlar elemento ou tocar robô no lado adversário durante o AUTO." },
+      { "rule": "G403", "penalty": "warning", "trigger": "Movimento motorizado na transição AUTO→TELEOP." },
+      { "rule": "G404", "penalty": "warning", "trigger": "Movimento motorizado após 0:00." },
+      { "rule": "G405", "penalty": "major", "per": "element", "trigger": "Ejetar elemento para fora do campo deliberadamente." },
+      { "rule": "G407", "penalty": "warning", "trigger": "Controlar mais de 4 elementos." },
+      { "rule": "G408", "penalty": "warning", "trigger": "Controlar NECTAR adversário." },
+      { "rule": "G410", "penalty": "major", "per": "nectar", "trigger": "NECTAR no volume da FLOWER antes de 1:00." },
+      { "rule": "G421", "penalty": "major", "per": "instance", "extraEverySeconds": 3, "trigger": "PIN por mais de 3 s." },
+      { "rule": "G426", "penalty": "minor", "per": "nectar", "trigger": "Humano introduz NECTAR antes do permitido." },
+      { "rule": "G427", "penalty": "minor", "per": "nectar", "trigger": "NECTAR introduzido fora da LOADING ZONE." }
+    ],
+    "note": "Regras com 'STRATEGIC' dependem de intenção; o simulador só pode sinalizar, não julgar."
+  },
+  "robot": {
+    "startingConfiguration": { "x": 18, "y": 18, "z": 18, "source": "R102 p.119" },
+    "expansionLimit": { "horizontal": [18, 24], "height": 29, "source": "R105 p.120" },
+    "weightLimit": null,
+    "weightLimitNote": "Não há limite de peso (R104 p.119). O simulador pede a massa estimada só para a física.",
+    "maxMotors": 8,
+    "maxServos": 8,
+    "servoLimits": { "maxPowerW": 8, "maxStallA": 4, "atVoltage": 6, "source": "R502 p.130" },
+    "battery": "1 bateria NiMH 12 V aprovada (R601 p.132)",
+    "controller": "REV Control Hub (ou smartphone + Expansion Hub) + no máx. 1 Expansion Hub (R701 p.136)",
+    "maxControlledElements": 4,
+    "forbidden": ["pneumatic-actuators", "vacuum", "floor-grabbing"],
+    "startRules": {
+      "touchingPerimeter": true,
+      "ownSideOnly": true,
+      "notInLoadingZone": true,
+      "notTouchingFlower": true,
+      "preloadPollen": 4,
+      "source": "G304 p.102"
+    }
+  }
+}
