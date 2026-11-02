@@ -20,7 +20,25 @@ export interface PhysicsWorld {
 export function createWorld(dt: number): PhysicsWorld {
   const world = new RAPIER.World({ x: 0, y: -9.81, z: 0 });
   world.timestep = dt;
+  // A distância de predição padrão (2 cm) é maior que as folgas do jogo (NECTAR na boca da FLOWER: 5 mm;
+  // POLLEN no anel do meio: 6 mm): os contatos especulativos seguravam as bolas no ar. 2 mm resolve,
+  // e o CCD dos elementos continua evitando que bolas rápidas atravessem paredes.
+  world.integrationParameters.normalizedPredictionDistance = 0.002;
   return { world, dt };
+}
+
+/**
+ * Grupos de colisão (16 bits de "sou membro de" + 16 bits de "colido com").
+ * O anel do meio da FLOWER só segura NECTAR: o POLLEN passa pelo furo (§9.7 p.70).
+ */
+export const COLLISION = {
+  pollen: 0x0002,
+  nectar: 0x0004,
+  all: 0xffff,
+};
+
+export function interactionGroups(membership: number, filter: number): number {
+  return ((membership & 0xffff) << 16) | (filter & 0xffff);
 }
 
 /** Quaternion de rotação em torno do eixo X do mundo (o eixo dos pivôs das HIVEs). */

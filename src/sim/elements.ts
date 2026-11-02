@@ -4,7 +4,7 @@ import * as THREE from "three";
 import type { Alliance } from "../rules/rules";
 import type { FlowerElement } from "../scoring/scoring";
 import { ELEMENTS, INCH, toWorld } from "./geometry";
-import { RAPIER, type PhysicsWorld } from "./physics";
+import { COLLISION, RAPIER, interactionGroups, type PhysicsWorld } from "./physics";
 
 export type ElementKind = FlowerElement;
 
@@ -70,8 +70,13 @@ export class ElementManager {
       .setLinearDamping(0.15)
       .setAngularDamping(0.6);
     const body = this.physics.world.createRigidBody(desc);
+    const group = kind === "pollen" ? COLLISION.pollen : COLLISION.nectar;
     this.physics.world.createCollider(
-      RAPIER.ColliderDesc.ball(radius * INCH).setMass(mass).setRestitution(0.35).setFriction(0.7),
+      RAPIER.ColliderDesc.ball(radius * INCH)
+        .setMass(mass)
+        .setRestitution(0.35)
+        .setFriction(0.7)
+        .setCollisionGroups(interactionGroups(group, COLLISION.all)),
       body,
     );
     if (velocity) body.setLinvel(velocity, true);
@@ -98,8 +103,16 @@ export class ElementManager {
   remove(element: GameElement): void {
     const i = this.elements.indexOf(element);
     if (i >= 0) this.elements.splice(i, 1);
+    const removedAt = element.body.translation();
     this.physics.world.removeRigidBody(element.body);
     this.scene.remove(element.mesh);
+    // O Rapier "adormece" corpos parados e remover um vizinho não os acorda: sem isso, os POLLEN
+    // de cima ficariam flutuando na FLOWER quando o de baixo é retirado pelo intake.
+    const wakeRadius = 0.6; // m, cobre uma pilha inteira de FLOWER
+    for (const other of this.elements) {
+      const p = other.body.translation();
+      if ((p.x - removedAt.x) ** 2 + (p.y - removedAt.y) ** 2 + (p.z - removedAt.z) ** 2 < wakeRadius ** 2) other.body.wakeUp();
+    }
   }
 
   /** Posição atual no sistema do manual (pol). */

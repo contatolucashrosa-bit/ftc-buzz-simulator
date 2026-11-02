@@ -5,7 +5,7 @@ import * as THREE from "three";
 import type { FlowerElement } from "../scoring/scoring";
 import { FLOWER, INCH, toWorld, type FlowerSpec } from "./geometry";
 import type { ElementManager, GameElement } from "./elements";
-import { RAPIER, type PhysicsWorld } from "./physics";
+import { COLLISION, RAPIER, interactionGroups, type PhysicsWorld } from "./physics";
 
 const CAGE_RADIUS = FLOWER.topOpeningRadius + FLOWER.pipeRadius; // eixo dos canos
 
@@ -23,15 +23,19 @@ export class Flower {
     group.position.copy(base);
     scene.add(group);
 
-    const addBox = (lx: number, ly: number, lz: number, hx: number, hy: number, hz: number, yaw: number, mat: THREE.Material) => {
+    // Peças sem atrito e regra "mínimo": com a regra padrão (média), o atrito da bola (0,7) a fazia "grudar"
+    // nos contatos preditivos dos canos e anéis, parada no ar dentro da FLOWER.
+    const addBox = (lx: number, ly: number, lz: number, hx: number, hy: number, hz: number, yaw: number, mat: THREE.Material, friction = 0, groups?: number) => {
       const q = new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(0, 1, 0), yaw);
       const p = toWorld(spec.x + lx, spec.y + ly, lz);
       physics.world.createCollider(
         RAPIER.ColliderDesc.cuboid(hx * INCH, hz * INCH, hy * INCH)
           .setTranslation(p.x, p.y, p.z)
           .setRotation({ x: q.x, y: q.y, z: q.z, w: q.w })
-          .setFriction(0.3)
-          .setRestitution(0.1),
+          .setFriction(friction)
+          .setFrictionCombineRule(RAPIER.CoefficientCombineRule.Min)
+          .setRestitution(0.1)
+          .setCollisionGroups(groups ?? interactionGroups(COLLISION.all, COLLISION.all)),
         body,
       );
       const mesh = new THREE.Mesh(new THREE.BoxGeometry(hx * 2 * INCH, hz * 2 * INCH, hy * 2 * INCH), mat);
@@ -41,7 +45,7 @@ export class Flower {
     };
 
     // Anel aproximado por segmentos retos tangentes (colisor) + um toro (visual).
-    const addRing = (innerRadius: number, width: number, zBottom: number, thickness: number, skipWallSide = false) => {
+    const addRing = (innerRadius: number, width: number, zBottom: number, thickness: number, groups?: number) => {
       const segments = 12;
       const mid = innerRadius + width / 2;
       const half = ((Math.PI * 2 * mid) / segments) * 0.55;
@@ -49,17 +53,17 @@ export class Flower {
         const a = (i / segments) * Math.PI * 2;
         const dx = Math.cos(a);
         const dy = Math.sin(a);
-        if (skipWallSide && dx * -spec.inward.x + dy * -spec.inward.y > 0.7) continue;
         // yaw em torno do Y do mundo: a tangente do segmento é perpendicular ao raio
-        addBox(dx * mid, dy * mid, zBottom + thickness / 2, half, width / 2, thickness / 2, a + Math.PI / 2, ringMaterial);
+        addBox(dx * mid, dy * mid, zBottom + thickness / 2, half, width / 2, thickness / 2, a + Math.PI / 2, ringMaterial, 0, groups);
       }
     };
 
     // anel de baixo (no piso): o POLLEN fica dentro dele
     addRing(FLOWER.lowerRingHoleRadius + 0.08, 0.8, 0, FLOWER.lowerRingHeight);
-    // anel do meio: segura NECTAR
+    // anel do meio: segura só NECTAR. O POLLEN passa pelo furo; com grupos de colisão a passagem não depende
+    // de milímetros de folga (o contato preditivo do Rapier chegava a segurar o POLLEN no ar).
     const middleBottom = FLOWER.lowerRingHeight + FLOWER.retrievalHeight;
-    addRing(FLOWER.middleRingHoleRadius, 1.0, middleBottom, FLOWER.middleRingThickness);
+    addRing(FLOWER.middleRingHoleRadius, 1.0, middleBottom, FLOWER.middleRingThickness, interactionGroups(COLLISION.all, COLLISION.nectar));
     // anel do topo
     addRing(FLOWER.topOpeningRadius, 0.8, FLOWER.topHeight - 0.4, 0.4);
 
@@ -70,7 +74,10 @@ export class Flower {
       const a = Math.PI / 4 + (i * Math.PI) / 2;
       const p = toWorld(spec.x + Math.cos(a) * CAGE_RADIUS, spec.y + Math.sin(a) * CAGE_RADIUS, pipeBottom + pipeHalf);
       physics.world.createCollider(
-        RAPIER.ColliderDesc.cylinder(pipeHalf * INCH, FLOWER.pipeRadius * INCH).setTranslation(p.x, p.y, p.z).setFriction(0.2),
+        RAPIER.ColliderDesc.cylinder(pipeHalf * INCH, FLOWER.pipeRadius * INCH)
+          .setTranslation(p.x, p.y, p.z)
+          .setFriction(0)
+          .setFrictionCombineRule(RAPIER.CoefficientCombineRule.Min),
         body,
       );
       const pipe = new THREE.Mesh(new THREE.CylinderGeometry(FLOWER.pipeRadius * INCH, FLOWER.pipeRadius * INCH, pipeHalf * 2 * INCH, 10), material);
