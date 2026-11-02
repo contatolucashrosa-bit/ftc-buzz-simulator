@@ -458,7 +458,9 @@ Cada marco termina com algo testável e com instruções de teste.
 - NECTAR do HUMAN PLAYER;
 - tela de resultado.
 
-Ainda pendente no M4: as faltas G402, G405, G421 e G426/G427 por detecção física. Próximo: **M5a** (teste do runtime Java com TeaVM).
+Ainda pendente no M4: as faltas G402, G405, G421 e G426/G427 por detecção física.
+
+**M5a concluído:** TeamCode real (SDK, Pedro Pathing 3.0.2 e o Quickstart inteiro do RoadRunner) compila e roda no navegador sem alterações. Detalhes, medições e limitações em [m5a-java-runtime.md](m5a-java-runtime.md). Próximo: **M5** (integrar o runtime Java ao jogo).
 
 | Marco | Entrega | Como testar |
 |---|---|---|
