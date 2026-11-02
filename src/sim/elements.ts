@@ -37,6 +37,49 @@ export const ELEMENT_COLORS: Record<ElementKind, number> = {
 };
 
 /** Cria e remove elementos; mantém a lista viva para a pontuação. */
+/**
+ * Textura dos 26 furos da bola (desenhos AndyMark: Ø 0,4 pol no POLLEN e Ø 0,6 pol no NECTAR).
+ * Furos distribuídos por espiral de Fibonacci e desenhados na projeção equirretangular da esfera,
+ * esticados por 1/cos(latitude) para continuarem redondos na bola.
+ */
+function perforationTexture(holeAngle: number): THREE.CanvasTexture | null {
+  // nos testes de física (Node) não há DOM: a bola fica lisa
+  if (typeof document === "undefined") return null;
+  const w = 512;
+  const h = 256;
+  const canvas = document.createElement("canvas");
+  canvas.width = w;
+  canvas.height = h;
+  const ctx = canvas.getContext("2d")!;
+  ctx.fillStyle = "#ffffff";
+  ctx.fillRect(0, 0, w, h);
+  const holes = 26;
+  const golden = Math.PI * (3 - Math.sqrt(5));
+  for (let i = 0; i < holes; i++) {
+    const yN = 1 - ((i + 0.5) / holes) * 2;
+    const lat = Math.asin(yN);
+    const lon = (i * golden) % (Math.PI * 2);
+    const cx = (lon / (Math.PI * 2)) * w;
+    const cy = (0.5 - lat / Math.PI) * h;
+    const ry = (holeAngle / Math.PI) * h;
+    const rx = Math.min(w / 2, ((holeAngle / (Math.PI * 2)) * w) / Math.max(0.15, Math.cos(lat)));
+    for (const dx of [-w, 0, w]) {
+      // borda mais clara (parede do furo) e o furo escuro
+      ctx.fillStyle = "#9a9a9a";
+      ctx.beginPath();
+      ctx.ellipse(cx + dx, cy, rx * 1.18, ry * 1.18, 0, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.fillStyle = "#262626";
+      ctx.beginPath();
+      ctx.ellipse(cx + dx, cy, rx, ry, 0, 0, Math.PI * 2);
+      ctx.fill();
+    }
+  }
+  const texture = new THREE.CanvasTexture(canvas);
+  texture.colorSpace = THREE.SRGBColorSpace;
+  return texture;
+}
+
 export class ElementManager {
   readonly elements: GameElement[] = [];
   private nextId = 1;
@@ -52,10 +95,12 @@ export class ElementManager {
       pollen: new THREE.SphereGeometry(ELEMENTS.pollenRadius * INCH, segments, Math.max(6, segments / 2)),
       nectar: new THREE.SphereGeometry(ELEMENTS.nectarRadius * INCH, segments, Math.max(6, segments / 2)),
     };
+    const pollenHoles = perforationTexture(0.2 / ELEMENTS.pollenRadius);
+    const nectarHoles = perforationTexture(0.3 / ELEMENTS.nectarRadius);
     this.materials = {
-      pollen: new THREE.MeshStandardMaterial({ color: ELEMENT_COLORS.pollen, roughness: 0.55 }),
-      redNectar: new THREE.MeshStandardMaterial({ color: ELEMENT_COLORS.redNectar, roughness: 0.5 }),
-      blueNectar: new THREE.MeshStandardMaterial({ color: ELEMENT_COLORS.blueNectar, roughness: 0.5 }),
+      pollen: new THREE.MeshStandardMaterial({ color: ELEMENT_COLORS.pollen, map: pollenHoles, roughness: 0.55 }),
+      redNectar: new THREE.MeshStandardMaterial({ color: ELEMENT_COLORS.redNectar, map: nectarHoles, roughness: 0.5 }),
+      blueNectar: new THREE.MeshStandardMaterial({ color: ELEMENT_COLORS.blueNectar, map: nectarHoles, roughness: 0.5 }),
     };
   }
 

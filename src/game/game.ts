@@ -12,6 +12,7 @@ import { ElementManager, allianceOfNectar, nectarOf } from "../sim/elements";
 import { Hive } from "../sim/hive";
 import { Flower } from "../sim/flower";
 import { Robot, robotConfigFromPreset } from "../sim/robot";
+import { Environment } from "../render/environment";
 import { robotPreset, type RobotPresetId } from "../config/robotPresets";
 import { ELEMENTS, FIELD, FLOWERS, GARDENS, HIVE, LOADING_ZONES, circleTouchesRect, toWorld, INCH } from "../sim/geometry";
 import { AutoRunner, buildAutoSteps, RED_START, type AutoProgramId } from "./autonomous";
@@ -98,6 +99,7 @@ export class Game {
   private readonly hives: Record<Alliance, Hive>;
   private readonly flowers: Flower[];
   private readonly robot: Robot;
+  private readonly environment: Environment;
   private readonly controls = new Controls();
   private readonly auto: AutoRunner;
 
@@ -140,6 +142,7 @@ export class Game {
     this.stage = new Stage(container, options.quality, "red");
     this.physics = createWorld(1 / quality.physicsHz);
     buildField(this.physics, this.stage.scene);
+    this.environment = new Environment(this.stage.scene, options.quality);
     this.elements = new ElementManager(this.physics, this.stage.scene, quality.sphereSegments);
     this.hives = {
       red: new Hive("red", this.physics, this.stage.scene, ALLIANCE_COLORS.red),
@@ -401,6 +404,9 @@ export class Game {
     this.elements.sync();
     this.robot.sync(this.clock().driverControl || this.options.mode === "practice");
     for (const hive of Object.values(this.hives)) hive.syncVisual();
+    // na câmera do piloto, o HUMAN PLAYER da própria aliança fica colado à câmera e tapava metade do campo
+    this.environment.humanPlayers.red.root.visible = this.stage.mode !== "driver";
+    this.environment.update(realDt);
     const t = this.robot.body.translation();
     this.stage.update({ position: new THREE.Vector3(t.x, t.y, t.z), heading: this.robot.pose().heading });
     this.stage.render();
@@ -518,6 +524,7 @@ export class Game {
     const lz = LOADING_ZONES[alliance];
     const x = alliance === "red" ? lz.xMin + 3 : lz.xMax - 3;
     this.elements.spawn(nectarOf(alliance), x, (lz.yMin + lz.yMax) / 2, 8);
+    this.environment.tossNectar(alliance);
     this.flash("NECTAR introduzido na LOADING ZONE");
   }
 

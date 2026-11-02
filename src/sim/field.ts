@@ -75,10 +75,10 @@ export function buildField(physics: PhysicsWorld, scene: THREE.Scene): void {
   floor.receiveShadow = true;
   scene.add(floor);
 
-  // Piso do ginásio ao redor e ALLIANCE AREAS (97 × 54 pol, §9.3; vermelha à esquerda da plateia, §9.5)
+  // Tablado do evento ao redor do campo (o gramado fica por conta do cenário) e ALLIANCE AREAS (97 × 54 pol, §9.3; vermelha à esquerda da plateia, §9.5)
   const outside = new THREE.Mesh(
-    new THREE.PlaneGeometry(12, 12),
-    new THREE.MeshStandardMaterial({ color: 0x2a2d33, roughness: 1 }),
+    new THREE.PlaneGeometry(7.4, 5.2),
+    new THREE.MeshStandardMaterial({ color: 0x3a3e46, roughness: 1 }),
   );
   outside.rotation.x = -Math.PI / 2;
   outside.position.y = -0.002;

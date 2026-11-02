@@ -37,3 +37,8 @@
 | 3 — HUMAN PLAYERS | Bonecos vermelho e azul com chapéu de apicultor; estados: esperar, pegar NECTAR, colocar na LOADING ZONE, voltar; respeitam a G426/G427 e os tempos | O NECTAR introduzido pela tecla N passa a ser entregue pelo boneco |
 | 4 — Ambiente | Grama, floresta, cogumelos e flores low-poly; plateia instanciada; banners com espaço trocável para a logo da WestSharks; luz e neblina | Trocar o preset e medir o FPS |
 | 5 — Experiência | Números animados, ícones de RP, resultados detalhados, ranking de qualificação local, replay curto | Partida completa e replay |
+
+## Situação (02/11/2026)
+- **Marco 2:** POLLEN e NECTAR perfurados (textura procedural com os 26 furos). Faltam instancing e sons.
+- **Marco 3:** HUMAN PLAYERS apicultores (vermelho e azul) com animação de entrega do NECTAR. Falta a máquina de estados completa (pegar, levar, voltar).
+- **Marco 4:** céu, gramado, floresta, cogumelos, flores, arquibancada com plateia (animada no Alto) e banners da WestSharks, tudo em `src/render/environment.ts`, com quantidades por preset. Medido no navegador: cerca de 57 FPS nos três presets (limite da taxa de atualização da tela).
