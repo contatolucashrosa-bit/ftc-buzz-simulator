@@ -1,0 +1,7 @@
+# CAD oficial da arena: fica fora do git até confirmar se a FIRST permite redistribuição
+cad/
+node_modules/
+dist/
+*.log
+# Manual oficial: material da FIRST, não redistribuído no repositório
+BIOBUZZ_Competition_Manual.pdf

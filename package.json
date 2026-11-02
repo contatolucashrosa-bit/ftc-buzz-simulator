@@ -1,0 +1,27 @@
+{
+  "name": "ftc-buzz-simulator",
+  "private": true,
+  "version": "0.1.0",
+  "description": "Buzz Simulator — simulador de FTC BIOBUZZ no navegador, offline e gratuito.",
+  "author": "Lucas Hochmann Rosa (https://github.com/contatolucashrosa-bit)",
+  "license": "MIT",
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "tsc --noEmit && vite build",
+    "preview": "vite preview",
+    "test": "vitest run",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@dimforge/rapier3d-compat": "^0.21.0",
+    "@fontsource/roboto": "^5.3.0",
+    "three": "^0.187.0"
+  },
+  "devDependencies": {
+    "@types/three": "^0.187.0",
+    "typescript": "^7.0.2",
+    "vite": "^8.3.5",
+    "vitest": "^5.0.5"
+  }
+}
