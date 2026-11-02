@@ -1,6 +1,7 @@
 // Buzz Simulator — Criado por Lucas Hochmann Rosa (https://github.com/contatolucashrosa-bit), em parceria com WestSharksFTC #24823.
 // Variantes de robô baseadas nos starter bots públicos do BIOBUZZ (goBILDA, REV DUO e AndyMark Robits).
 // Só os parâmetros vêm dos CADs e das páginas dos fabricantes; o modelo 3D é nosso (os CADs não são redistribuídos).
+// Medidas (pol) tiradas dos CADs convertidos com scripts/step-to-glb.mjs e orientados na Oficina.
 // Módulo leve: a página inicial usa a lista sem carregar o motor 3D. Detalhes em docs/starter-bots.md.
 import { DEFAULT_LAUNCH_INTERVAL_S } from "./robotDefaults";
 
@@ -66,9 +67,9 @@ export const ROBOT_PRESETS: Record<RobotPresetId, RobotPreset> = {
     id: "gobilda",
     label: "goBILDA Starter Bot",
     description: "6WD drop-center (não anda de lado), intake de rodas Gecko que puxa o POLLEN de dentro da FLOWER, lançador. Até 4 elementos.",
-    length: 17,
-    width: 16.5,
-    height: 15,
+    length: 17.8,
+    width: 16.8,
+    height: 12,
     drivetrain: "tank",
     massKg: 11,
     maxSpeed: 1.5,
@@ -87,9 +88,9 @@ export const ROBOT_PRESETS: Record<RobotPresetId, RobotPreset> = {
     id: "revDuo",
     label: "REV DUO Starter Bot",
     description: "Tração tanque por correias, intake, lançador e um servo \"cutucador\" que tira o POLLEN da FLOWER para o chão.",
-    length: 17.5,
-    width: 17,
-    height: 14,
+    length: 18,
+    width: 16.5,
+    height: 9.3,
     drivetrain: "tank",
     massKg: 10,
     maxSpeed: 1.3,
@@ -108,9 +109,9 @@ export const ROBOT_PRESETS: Record<RobotPresetId, RobotPreset> = {
     id: "andymark",
     label: "AndyMark Robits Starter Bot",
     description: "Tração tanque com rodas omni e stealth (gira fácil), intake de rodas complacentes, lançador com capô e servo que solta o POLLEN da FLOWER.",
-    length: 17,
-    width: 17,
-    height: 15,
+    length: 17.7,
+    width: 17.2,
+    height: 17.5,
     drivetrain: "tank",
     massKg: 11,
     maxSpeed: 1.4,

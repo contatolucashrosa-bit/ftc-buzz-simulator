@@ -33,18 +33,25 @@ Os robôs ficam no IndexedDB **deste aparelho**. Nada é enviado para a internet
 
 **Solução:**
 1. O script lê as entidades do STEP e mantém a **estrutura da montagem inteira** (produtos, posições, cores).
-2. A **geometria** é separada em lotes de sólidos (`--batch`, padrão 120). Cada lote vira um STEP pequeno, lido por uma instância nova do OpenCascade.
-3. Um lote que falha perde só as próprias peças. Lotes menores (`--batch 8`) isolam as peças ruins.
-4. As peças menores que `--min-size` mm (padrão 8: parafusos, porcas) são descartadas.
+2. A **geometria** é separada em lotes de sólidos (`--batch`, padrão 8). Cada lote vira um STEP pequeno, lido por uma instância nova do OpenCascade.
+3. Um lote que falha perde só as próprias peças, por isso os lotes são pequenos.
+4. As peças menores que `--min-size` mm (padrão 20: parafusos, porcas, espaçadores) são descartadas.
 5. As malhas são juntadas por cor e gravadas num GLB, em metros. Ao guardar na Oficina, o modelo é juntado de novo por cor, para ter poucas chamadas de desenho no jogo.
 
 **Opções:**
 
 | Opção | Padrão | Efeito |
 |---|---|---|
-| `--batch` | 120 | Sólidos por lote |
-| `--min-size` | 8 | Descarta peças menores (mm) |
-| `--deflection` | 1,2 | Erro máximo da malha (mm); maior deixa o arquivo mais leve |
+| `--batch` | 8 | Sólidos por lote |
+| `--min-size` | 20 | Descarta peças menores (mm) |
+| `--deflection` | 3 | Erro máximo da malha (mm); maior deixa o arquivo mais leve |
+| `--angular` | 1,2 | Desvio angular máximo da malha (rad) |
+| `--triangles` | 250000 | Meta após a simplificação (meshoptimizer, MIT) |
+
+**Simplificação:** as placas furadas dos kits geram 1 a 3 milhões de triângulos. O conversor une os vértices repetidos e simplifica com o `meshoptimizer` até a meta. Peças soltas muito pequenas são podadas. Para deixar mais leve um GLB já convertido, sem ler o STEP de novo:
+```bash
+node scripts/glb-simplify.mjs robo.glb robo-leve.glb --triangles 150000
+```
 
 ## Starter bots
-Os três starter bots de referência foram convertidos com este script. Os GLBs ficam em `cad/robots/`, fora do git, porque não temos licença para redistribuir os CADs dos fabricantes. Para jogar com eles, cada equipe baixa o CAD no site do fabricante, converte e importa na Oficina.
+Os três starter bots de referência foram convertidos com este script (cerca de 240 mil triângulos e 4 a 5 MB cada, depois de guardados na Oficina). Com o CAD, o jogo roda a 60 FPS. Os GLBs ficam em `cad/robots/`, fora do git, porque não temos licença para redistribuir os CADs dos fabricantes. Para jogar com eles, cada equipe baixa o CAD no site do fabricante, converte e importa na Oficina.

@@ -35,8 +35,8 @@ Os três são os robôs **mais simples** da temporada:
 ## Parâmetros usados (`src/config/robotPresets.ts`)
 | Parâmetro | Robô de treino | goBILDA | REV DUO | AndyMark |
 |---|---|---|---|---|
-| Base (pol) | 18 × 18 | 17 × 16,5 | 17,5 × 17 | 17 × 17 |
-| Altura do lançador (pol) | 16 | 15 | 14 | 15 |
+| Base (pol), frente × lado | 18 × 18 | 17,8 × 16,8 | 18 × 16,5 ¹ | 17,7 × 17,2 |
+| Altura (pol) | 16 | 12,0 | 9,3 | 17,5 |
 | Tração | mecanum | tanque | tanque | tanque |
 | Velocidade máx. (m/s) | 1,6 | 1,5 | 1,3 | 1,4 |
 | Giro máx. (rad/s) | 3,5 | 3,2 | 3,0 | 3,8 |
@@ -44,9 +44,27 @@ Os três são os robôs **mais simples** da temporada:
 | Tempo entre lançamentos (s) | 0,30 | 0,45 | 0,50 | 0,40 |
 | Retirada na FLOWER | intake | intake | servo | servo |
 
+**Medidas:** base e altura vêm dos CADs, convertidos com `npm run cad:convert` e orientados na Oficina (vista de cima).
+
+| Starter bot | Peças convertidas | Eixo para cima no CAD | Caixa medida (pol) |
+|---|---|---|---|
+| goBILDA | 289 (908 pequenas descartadas) | Z | 17,8 × 16,8 × 12,0 |
+| REV DUO | 336 (1170 pequenas descartadas) | Z | 22,3 × 16,5 × 9,3 ¹ |
+| AndyMark Robits | 390 (418 pequenas descartadas) | Y | 17,7 × 17,2 × 17,5 |
+
+¹ A caixa do REV DUO passa de 18 pol no comprimento. Provavelmente alguma peça está fora da posição de largada ou solta no CAD; a física usa 18 pol (R102).
+
 **Suposições:**
-- Base e altura são estimativas dentro do limite de 18 × 18 pol (R102). Serão trocadas pelas caixas medidas nos STEPs em `cad/robots/*.json` assim que a medição terminar.
+- A frente de cada modelo (lado do intake) foi escolhida pela vista de cima. No AndyMark ela é a menos certa: se o robô aparecer andando de costas, gire 180° na Oficina.
 - Velocidade, giro, massa e tempo entre lançamentos são estimativas pelo tipo de motor e de tração, não medidas. A Oficina vai calcular esses valores pelo mecanismo real de cada equipe.
+
+## Jogar com o CAD de verdade
+Os CADs dos fabricantes não ficam no repositório, mas cada equipe pode baixá-los, convertê-los e importá-los na Oficina (passo a passo em `docs/cad-import.md`):
+1. `npm run cad:convert -- "REV DUO - FTC Starter Bot - BIOBUZZ.step" rev-duo.glb`
+2. Oficina → escolher o GLB → eixo e frente → mecanismos "REV DUO Starter Bot" → guardar.
+3. Na tela "Jogar", escolher o robô marcado como "CAD importado".
+
+Com o CAD importado, o modelo do fabricante substitui o nosso, e a física continua a da variante.
 
 ## Como o servo funciona no simulador
 1. O robô encosta a frente na FLOWER (até 6 pol entre a frente e o eixo).
