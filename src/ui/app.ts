@@ -6,6 +6,7 @@ import type { GameMode, GameOptions } from "../game/game";
 import type { Quality } from "../render/stage";
 import { escapeHtml } from "./dom";
 import { ICON_BRAND } from "./icons";
+import { LAUNCH_INTERVAL_LIMITS, clampLaunchInterval as clampInterval } from "../config/robotDefaults";
 
 type Route = "home" | "setup" | "workshop" | "leaderboard" | "teamRobots" | "about";
 
@@ -161,6 +162,11 @@ export class App {
           <small>Programas de exemplo. A importação do seu código Java do Android Studio chega no marco M5.</small>
         </fieldset>
         <div class="field">
+          <label for="interval">Tempo entre lançamentos (s)</label>
+          <input id="interval" type="number" inputmode="decimal" min="${LAUNCH_INTERVAL_LIMITS.min}" max="${LAUNCH_INTERVAL_LIMITS.max}" step="0.05" value="${p.launchIntervalS}">
+          <small>Um toque em "lançar" dispara todo o depósito, um elemento após o outro. Este é o tempo que o lançador do seu robô leva para recuperar a velocidade entre duas bolas (padrão 0,30 s). Lançadores com volante mais pesado ou mais motores recuperam mais rápido.</small>
+        </div>
+        <div class="field">
           <label for="quality">Qualidade gráfica</label>
           <select id="quality">${qualityOptions}</select>
           <small>Se o jogo ficar lento, escolha "Baixa".</small>
@@ -181,6 +187,7 @@ export class App {
         eventName: form.querySelector<HTMLInputElement>("#event")!.value.trim() || "Treino da equipe",
         autoProgram: (form.querySelector<HTMLInputElement>('input[name="auto"]:checked')?.value as AutoProgramId) ?? "leavePark",
         quality: form.querySelector<HTMLSelectElement>("#quality")!.value as Quality,
+        launchIntervalS: clampInterval(Number(form.querySelector<HTMLInputElement>("#interval")!.value.replace(",", "."))),
       };
       savePrefs(this.prefs);
     };
@@ -231,6 +238,7 @@ export class App {
       teamNumber: this.prefs.teamNumber,
       eventName: this.prefs.eventName,
       matchLabel: mode === "practice" ? "Treino livre" : "Partida de treino",
+      launchIntervalS: clampInterval(this.prefs.launchIntervalS),
     };
     history.replaceState(null, "", "#play");
     this.root.innerHTML = "";

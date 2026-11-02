@@ -6,13 +6,13 @@ import { clockAt, formatClock, matchDuration, nectarAllowance, type ClockState }
 import { computeScore, emptySnapshot, type MatchScore, type MatchSnapshot } from "../scoring/scoring";
 import { Controls, type ControlState } from "../input/controls";
 import { Stage, QUALITY_SETTINGS, CAMERA_LABELS, type Quality } from "../render/stage";
-import { createWorld, initPhysics, type PhysicsWorld } from "../sim/physics";
+import { RAPIER, createWorld, initPhysics, type PhysicsWorld } from "../sim/physics";
 import { buildField, ALLIANCE_COLORS } from "../sim/field";
 import { ElementManager, allianceOfNectar, nectarOf } from "../sim/elements";
 import { Hive } from "../sim/hive";
 import { Flower } from "../sim/flower";
 import { Robot, DEFAULT_ROBOT } from "../sim/robot";
-import { ELEMENTS, FIELD, FLOWERS, GARDENS, HIVE, LOADING_ZONES, circleTouchesRect } from "../sim/geometry";
+import { ELEMENTS, FIELD, FLOWERS, GARDENS, HIVE, LOADING_ZONES, circleTouchesRect, toWorld, INCH } from "../sim/geometry";
 import { AutoRunner, buildAutoSteps, RED_START, type AutoProgramId } from "./autonomous";
 
 export type GameMode = "practice" | "match";
@@ -24,6 +24,8 @@ export interface GameOptions {
   teamNumber: string;
   eventName: string;
   matchLabel: string;
+  /** Tempo entre lançamentos na rajada (s); depende do mecanismo do robô. */
+  launchIntervalS: number;
 }
 
 export interface FoulEntry {
@@ -46,6 +48,8 @@ export interface GameView {
   intakeOn: boolean;
   launcherSpeed: number;
   launcherPitch: number;
+  launchIntervalS: number;
+  bursting: boolean;
   nectarAvailable: number;
   nectarInArea: number;
   cameraLabel: string;
@@ -54,6 +58,8 @@ export interface GameView {
   messages: string[];
   fps: number;
   settling: boolean;
+  /** Onde as duas HIVEs aparecem na tela (px do canvas), para o placar ficar translúcido sobre elas. */
+  hiveRect: { left: number; top: number; right: number; bottom: number } | null;
   teamNumber: string;
   eventName: string;
   matchLabel: string;
@@ -63,6 +69,7 @@ export interface GameCallbacks {
   onView(view: GameView): void;
   onFinished(view: GameView): void;
   onPauseRequest(): void;
+  onOverlayModeRequest(): void;
 }
 
 interface NectarPool {
@@ -74,6 +81,12 @@ interface NectarPool {
 }
 
 const SETTLE_SECONDS = 3; // apuração depois que tudo para (§10.5)
+const TOAST_SECONDS = 2;
+
+/** Cantos das duas HIVEs (inclinadas ou não), no mundo, para saber onde aparecem na tela. */
+const HIVE_POINTS = [-1, 1].flatMap((sx) =>
+  [-1, 1].flatMap((sy) => [30, 66].map((z) => toWorld(sx * (HIVE.centerX.blue + HIVE.cellWidth / 2), sy * (HIVE.cellInnerY + HIVE.cellDepth), z))),
+);
 const PHASE_LABELS = { pre: "Pronto", auto: "AUTO", transition: "Transição", teleop: "TELEOP", post: "Fim" } as const;
 
 export class Game {
@@ -132,7 +145,7 @@ export class Game {
     };
     this.flowers = FLOWERS.map((spec) => new Flower(spec, this.physics, this.stage.scene));
     this.robot = new Robot(
-      { ...DEFAULT_ROBOT, alliance: "red", teamNumber: options.teamNumber, start: RED_START },
+      { ...DEFAULT_ROBOT, alliance: "red", teamNumber: options.teamNumber, start: RED_START, launchIntervalS: options.launchIntervalS },
       this.physics,
       this.stage.scene,
     );
@@ -163,11 +176,102 @@ export class Game {
         this.robot.launcherSpeed = speed;
         this.robot.launcherPitchDeg = pitch;
       },
-      launch: () => this.robot.launch(this.elements, true),
+      launch: () => this.robot.launchOne(this.elements, true),
       place: () => this.robot.place(this.elements, true),
       give: (kind: "pollen" | "redNectar") => this.robot.hopper.push(kind),
       camera: (mode: "audience" | "driver" | "follow" | "top" | "free") => this.stage.setCamera(mode),
       skipTo: (elapsedSeconds: number) => (this.elapsed = elapsedSeconds),
+      followOrbit: () => ({ ...this.stage.followOrbit }),
+      sleeping: () => this.elements.elements.map((e) => e.body.isSleeping()),
+      wakeAll: () => this.elements.elements.forEach((e) => e.body.wakeUp()),
+      /** Colisores que ocupariam uma esfera de raio r (pol) centrada em (x, y, z). */
+      overlapsSphere: (x: number, y: number, z: number, r: number) => {
+        const c = toWorld(x, y, z);
+        const found: Array<{ fixed: boolean; shape: number; at: { x: number; y: number; z: number }; halfExtents?: number[] }> = [];
+        this.physics.world.intersectionsWithShape({ x: c.x, y: c.y, z: c.z }, { x: 0, y: 0, z: 0, w: 1 }, new RAPIER.Ball(r * INCH), (other) => {
+          const t = other.translation();
+          const shape = other.shape as unknown as { halfExtents?: { x: number; y: number; z: number } };
+          found.push({
+            fixed: !other.parent()?.isDynamic(),
+            shape: other.shape.type,
+            at: { x: +(t.x / INCH).toFixed(2), y: +(-t.z / INCH).toFixed(2), z: +(t.y / INCH).toFixed(2) },
+            halfExtents: shape.halfExtents ? [shape.halfExtents.x / INCH, shape.halfExtents.y / INCH, shape.halfExtents.z / INCH].map((v) => +v.toFixed(2)) : undefined,
+          });
+          return true;
+        });
+        return found;
+      },
+      kickNear: (x: number, y: number, vy: number) =>
+        this.elements.elements.forEach((e) => {
+          const p = this.elements.position(e);
+          if (Math.hypot(p.x - x, p.y - y) < 3) e.body.setLinvel({ x: 0, y: vy, z: 0 }, true);
+        }),
+      setCcdNear: (x: number, y: number, on: boolean) =>
+        this.elements.elements.forEach((e) => {
+          const p = this.elements.position(e);
+          if (Math.hypot(p.x - x, p.y - y) < 3) {
+            e.body.enableCcd(on);
+            e.body.wakeUp();
+          }
+        }),
+      /** Contatos ativos do elemento mais baixo perto de (x, y): com que ele está encostado. */
+      contactsNear: (x: number, y: number) => {
+        const near = this.elements.elements
+          .map((e) => ({ e, p: this.elements.position(e) }))
+          .filter(({ p }) => Math.hypot(p.x - x, p.y - y) < 3)
+          .sort((a, b) => b.p.z - a.p.z)[0];
+        if (!near) return null;
+        const collider = near.e.body.collider(0);
+        const contacts: Array<{ fixed: boolean; at: { x: number; y: number; z: number }; shape: number; dist: number }> = [];
+        this.physics.world.contactPairsWith(collider, (other) => {
+          this.physics.world.contactPair(collider, other, (manifold) => {
+            if (manifold.numContacts() === 0) return;
+            const t = other.translation();
+            contacts.push({
+              fixed: !other.parent()?.isDynamic(),
+              at: { x: +(t.x / INCH).toFixed(2), y: +(-t.z / INCH).toFixed(2), z: +(t.y / INCH).toFixed(2) },
+              shape: other.shape.type,
+              dist: +(manifold.contactDist(0) / INCH).toFixed(3),
+            });
+          });
+        });
+        return { ball: near.p, vy: near.e.body.linvel().y, gravityScale: near.e.body.gravityScale(), contacts };
+      },
+      velocities: () => this.elements.elements.map((e) => +e.body.linvel().y.toFixed(3)),
+      /** Todos os corpos não fixos perto de (x, y) em pol: tipo, altura e se é um elemento registrado. */
+      bodiesNear: (x: number, y: number, r: number) => {
+        const out: Array<{ handle: number; z: number; kind: string; registered: boolean; colliders: number }> = [];
+        this.physics.world.forEachRigidBody((body) => {
+          if (body.isFixed()) return;
+          const t = body.translation();
+          const p = { x: t.x / INCH, y: -t.z / INCH, z: t.y / INCH };
+          if (Math.hypot(p.x - x, p.y - y) > r) return;
+          out.push({
+            handle: body.handle,
+            z: +p.z.toFixed(2),
+            kind: body.isKinematic() ? "kinematic" : "dynamic",
+            registered: this.elements.elements.some((e) => e.body.handle === body.handle),
+            colliders: body.numColliders(),
+          });
+        });
+        return out;
+      },
+      /** Raio vertical para baixo a partir de (x, y, z) em pol: distância até o primeiro colisor fixo/cinemático. */
+      probeDown: (x: number, y: number, z: number) => {
+        const origin = toWorld(x, y, z);
+        const hits: Array<{ toi: number; fixed: boolean }> = [];
+        this.physics.world.intersectionsWithRay(
+          new RAPIER.Ray({ x: origin.x, y: origin.y, z: origin.z }, { x: 0, y: -1, z: 0 }),
+          z * INCH + 0.01,
+          false,
+          (hit) => {
+            const parent = hit.collider.parent();
+            hits.push({ toi: +(hit.timeOfImpact / INCH).toFixed(2), fixed: !!parent && !parent.isDynamic() });
+            return true;
+          },
+        );
+        return hits.sort((a, b) => a.toi - b.toi);
+      },
     };
   }
 
@@ -234,7 +338,7 @@ export class Game {
     this.stage.cycleCamera();
   }
 
-  private flash(text: string, seconds = 3): void {
+  private flash(text: string, seconds = TOAST_SECONDS): void {
     this.messages.push({ text, until: performance.now() + seconds * 1000 });
   }
 
@@ -263,6 +367,10 @@ export class Game {
     this.lastControls = input;
     if (input.pause) this.callbacks.onPauseRequest();
     if (input.camera) this.stage.cycleCamera();
+    if (input.overlayMode) this.callbacks.onOverlayModeRequest();
+    if (this.stage.mode === "follow" && (input.cameraYaw || input.cameraPitch)) {
+      this.stage.adjustFollow(input.cameraYaw * 2.4 * realDt, input.cameraPitch * 1.6 * realDt, 0);
+    }
     if (input.toggleRelative) {
       this.relativeDrive = !this.relativeDrive;
       this.flash(this.relativeDrive ? "Direção relativa à câmera" : "Direção relativa ao robô");
@@ -314,18 +422,20 @@ export class Game {
           this.robot.launcherSpeed = speed;
           this.robot.launcherPitchDeg = pitch;
         },
-        launch: () => this.robot.launch(this.elements, true) !== null,
+        launchAll: () => this.robot.startBurst(true),
+        hopperCount: () => this.robot.hopper.length,
       });
       this.robot.intakeOn = false;
     } else if (before.driverControl) {
       command = this.driverCommand(input);
       this.robot.intakeOn = input.intakeHeld;
-      if (launch) this.robot.launch(this.elements, true);
+      if (launch) this.robot.startBurst(true);
       if (place) this.robot.place(this.elements, true);
     } else {
       this.robot.intakeOn = false;
     }
     this.robot.drive(command, dt, before.robotsEnabled && matchRunning);
+    this.robot.updateBurst(this.elements, before.robotsEnabled && matchRunning);
     this.robot.updateIntake(this.elements, before.robotsEnabled && matchRunning);
 
     if (nectar) this.introduceNectar("red", before);
@@ -354,7 +464,7 @@ export class Game {
       }
       if (before.phase === "transition" && after.phase === "teleop") this.flash("TELEOP: pilotos no controle!");
       if (before.phase === "teleop" && before.matchSecondsRemaining > RULES.flowerUnlockClock && after.flowerUnlocked) {
-        this.flash("1:00 — FLOWERS liberadas e todo o NECTAR pode entrar!", 4);
+        this.flash("1:00 — FLOWERS liberadas e todo o NECTAR pode entrar!");
       }
       if (after.phase === "post" && !this.finished) {
         this.settleTimer += dt;
@@ -423,7 +533,7 @@ export class Game {
           text: "NECTAR na FLOWER antes de 1:00 restante",
           clock: formatClock(clock.displaySeconds),
         });
-        this.flash("MAJOR FOUL (G410): NECTAR na FLOWER antes de 1:00", 4);
+        this.flash("MAJOR FOUL (G410): NECTAR na FLOWER antes de 1:00");
       }
     }
   }
@@ -506,6 +616,8 @@ export class Game {
       intakeOn: this.robot.intakeOn || !!this.lastControls?.intakeHeld,
       launcherSpeed: this.robot.launcherSpeed,
       launcherPitch: this.robot.launcherPitchDeg,
+      launchIntervalS: this.robot.config.launchIntervalS,
+      bursting: this.robot.bursting,
       nectarAvailable: this.nectarAvailable("red", clock),
       nectarInArea: this.pools.red.staged + this.pools.red.returned,
       cameraLabel: CAMERA_LABELS[this.stage.mode],
@@ -514,6 +626,7 @@ export class Game {
       messages: this.messages.map((m) => m.text),
       fps: this.fps,
       settling: clock.phase === "post" && !this.finished,
+      hiveRect: this.stage.screenRect(HIVE_POINTS),
       teamNumber: this.options.teamNumber,
       eventName: this.options.eventName,
       matchLabel: this.options.matchLabel,

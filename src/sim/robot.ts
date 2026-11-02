@@ -8,6 +8,7 @@ import { allianceOfNectar, type ElementKind, type ElementManager } from "./eleme
 import { FIELD, INCH, toWorld, type Rect } from "./geometry";
 import { RAPIER, quatAboutY, yawOf, type PhysicsWorld } from "./physics";
 import { ALLIANCE_COLORS } from "./field";
+import { DEFAULT_LAUNCH_INTERVAL_S } from "../config/robotDefaults";
 
 export interface DriveCommand {
   /** Frente/trás, esquerda/direita (referencial do robô) e giro; todos entre -1 e 1. */
@@ -24,6 +25,8 @@ export interface RobotConfig {
   maxSpeed: number; // m/s
   maxAccel: number; // m/s²
   maxTurnRate: number; // rad/s
+  /** Tempo entre um lançamento e o próximo numa rajada (recuperação do lançador), em segundos. */
+  launchIntervalS: number;
 }
 
 export const DEFAULT_ROBOT: Omit<RobotConfig, "alliance" | "teamNumber" | "start"> = {
@@ -31,6 +34,7 @@ export const DEFAULT_ROBOT: Omit<RobotConfig, "alliance" | "teamNumber" | "start
   maxSpeed: 1.6,
   maxAccel: 4,
   maxTurnRate: 3.5,
+  launchIntervalS: DEFAULT_LAUNCH_INTERVAL_S,
 };
 
 const HALF = 9; // pol (18 pol de lado)
@@ -68,6 +72,7 @@ export class Robot {
   launcherPitchDeg = 42;
   disabled = false;
   private cooldown = 0;
+  private burst = false;
   private velocity = new THREE.Vector2(); // m/s no mundo (x, z)
   private readonly trajectory: THREE.Line;
 
@@ -273,25 +278,47 @@ export class Robot {
     );
   }
 
-  /** Lança o próximo elemento. Devolve o tipo lançado ou null. */
-  launch(elements: ElementManager, enabled: boolean): ElementKind | null {
+  /** Lança um único elemento agora (se o lançador já recuperou). Devolve o tipo lançado ou null. */
+  launchOne(elements: ElementManager, enabled: boolean): ElementKind | null {
     if (!enabled || this.disabled || this.cooldown > 0 || this.hopper.length === 0) return null;
     const kind = this.hopper.shift()!;
     const p = this.exitPoint(LAUNCH_EXIT);
     const e = elements.spawn(kind, p.x, p.y, p.z, this.launchVelocity());
     e.lastLaunchedBy = this.config.alliance;
-    this.cooldown = 0.35;
+    this.cooldown = this.config.launchIntervalS;
     return kind;
+  }
+
+  /** Começa uma rajada: lança todo o depósito, um elemento a cada `launchIntervalS`. */
+  startBurst(enabled: boolean): boolean {
+    if (!enabled || this.disabled || this.hopper.length === 0) return false;
+    this.burst = true;
+    return true;
+  }
+
+  get bursting(): boolean {
+    return this.burst;
+  }
+
+  /** Avança a rajada; chamado a cada passo de física. */
+  updateBurst(elements: ElementManager, enabled: boolean): void {
+    if (!this.burst) return;
+    if (!enabled || this.disabled || this.hopper.length === 0) {
+      this.burst = false;
+      return;
+    }
+    this.launchOne(elements, enabled);
+    if (this.hopper.length === 0) this.burst = false;
   }
 
   /** Solta o próximo elemento à frente, no alto: para colocar dentro de uma FLOWER. */
   place(elements: ElementManager, enabled: boolean): ElementKind | null {
-    if (!enabled || this.disabled || this.cooldown > 0 || this.hopper.length === 0) return null;
+    if (!enabled || this.disabled || this.burst || this.cooldown > 0 || this.hopper.length === 0) return null;
     const kind = this.hopper.shift()!;
+    // Solta parado, sobre o eixo: a boca da FLOWER (4 pol) deixa só 0,2 pol de folga para o NECTAR (3,6 pol),
+    // e qualquer velocidade para a frente o faria pousar na borda, preso no batente.
     const p = this.exitPoint(PLACE_EXIT);
-    const { heading } = this.pose();
-    const v = new THREE.Vector3(Math.cos(heading) * 0.15, 0, -Math.sin(heading) * 0.15);
-    const e = elements.spawn(kind, p.x, p.y, p.z, v);
+    const e = elements.spawn(kind, p.x, p.y, p.z);
     e.lastLaunchedBy = this.config.alliance;
     this.cooldown = 0.4;
     return kind;

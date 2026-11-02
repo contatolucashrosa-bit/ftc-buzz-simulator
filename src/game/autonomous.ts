@@ -18,7 +18,7 @@ export const AUTO_PROGRAMS: Record<AutoProgramId, { label: string; description: 
 export type AutoStep =
   | { kind: "goTo"; x: number; y: number; heading: number; maxPower?: number }
   | { kind: "aim"; speed: number; pitchDeg: number }
-  | { kind: "launch"; count: number; spacingS: number }
+  | { kind: "launchAll"; timeoutS: number }
   | { kind: "wait"; seconds: number };
 
 /** Pose inicial padrão do robô vermelho 1 (G304: no próprio lado, tocando a parede, fora da LOADING ZONE). */
@@ -66,7 +66,7 @@ export function buildAutoSteps(id: AutoProgramId): AutoStep[] {
         { kind: "goTo", x: HIVE.centerX.red, y: shootY, heading: Math.PI / 2 },
         { kind: "aim", speed: aim.speed, pitchDeg: aim.pitchDeg },
         { kind: "wait", seconds: 0.4 },
-        { kind: "launch", count: 4, spacingS: 0.5 },
+        { kind: "launchAll", timeoutS: 4 },
         ...park,
       ];
     }
@@ -83,14 +83,15 @@ function angleDiff(a: number, b: number): number {
 export interface AutoActuators {
   pose(): { x: number; y: number; heading: number };
   setAim(speed: number, pitchDeg: number): void;
-  launch(): boolean;
+  /** Dispara a rajada do robô (todo o depósito). */
+  launchAll(): boolean;
+  hopperCount(): number;
 }
 
 /** Executa os passos; chamado a cada passo de física durante o AUTO. */
 export class AutoRunner {
   private index = 0;
   private timer = 0;
-  private launched = 0;
 
   constructor(private readonly steps: AutoStep[]) {}
 
@@ -105,7 +106,6 @@ export class AutoRunner {
     const next = () => {
       this.index++;
       this.timer = 0;
-      this.launched = 0;
     };
 
     if (step.kind === "goTo") {
@@ -135,12 +135,9 @@ export class AutoRunner {
       next();
     } else if (step.kind === "wait") {
       if (this.timer >= step.seconds) next();
-    } else if (step.kind === "launch") {
-      if (this.launched < step.count && this.timer >= this.launched * step.spacingS) {
-        robot.launch();
-        this.launched++;
-      }
-      if (this.launched >= step.count) next();
+    } else if (step.kind === "launchAll") {
+      if (this.timer <= dt) robot.launchAll();
+      if (robot.hopperCount() === 0 || this.timer >= step.timeoutS) next();
     }
     return idle;
   }

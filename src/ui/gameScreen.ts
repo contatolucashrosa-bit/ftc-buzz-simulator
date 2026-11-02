@@ -6,6 +6,50 @@ import { ICON_POLLINATOR, ICON_ROBOT, ICON_SWARM } from "./icons";
 import { escapeHtml } from "./dom";
 import type { AllianceScore } from "../scoring/scoring";
 
+export type OverlayMode = "broadcast" | "driver" | "hidden";
+export type OverlayScale = 0.5 | 0.75 | 1;
+
+const OVERLAY_MODES: Array<{ id: OverlayMode; label: string }> = [
+  { id: "broadcast", label: "Transmissão" },
+  { id: "driver", label: "Piloto (compacto)" },
+  { id: "hidden", label: "Oculto" },
+];
+const OVERLAY_SCALES: OverlayScale[] = [0.5, 0.75, 1];
+const HUD_KEY = "buzz-simulator:hud";
+
+interface HudPrefs {
+  mode: OverlayMode;
+  scale: OverlayScale;
+  robotPanelCollapsed: boolean;
+}
+
+function loadHudPrefs(): HudPrefs {
+  // Padrão 0,5×: o placar inteiro continua legível e deixa a HIVE livre na visão do piloto.
+  const fallback: HudPrefs = { mode: "broadcast", scale: 0.5, robotPanelCollapsed: false };
+  try {
+    const saved = JSON.parse(localStorage.getItem(HUD_KEY) ?? "{}") as Partial<HudPrefs>;
+    return {
+      mode: OVERLAY_MODES.some((m) => m.id === saved.mode) ? saved.mode! : fallback.mode,
+      scale: OVERLAY_SCALES.includes(saved.scale as OverlayScale) ? saved.scale! : fallback.scale,
+      robotPanelCollapsed: saved.robotPanelCollapsed === true,
+    };
+  } catch {
+    return fallback;
+  }
+}
+
+function saveHudPrefs(prefs: HudPrefs): void {
+  try {
+    localStorage.setItem(HUD_KEY, JSON.stringify(prefs));
+  } catch {
+    // sem armazenamento: vale só nesta sessão
+  }
+}
+
+function rectsOverlap(a: { left: number; top: number; right: number; bottom: number }, b: DOMRect): boolean {
+  return a.left < b.right && a.right > b.left && a.top < b.bottom && a.bottom > b.top;
+}
+
 export interface GameScreenActions {
   exitToHome(): void;
   restart(options: GameOptions): void;
@@ -55,7 +99,7 @@ export async function mountGameScreen(root: HTMLElement, options: GameOptions, a
   root.innerHTML = `
     <div class="game" role="application" aria-label="Arena do Buzz Simulator">
       <div class="stage-host"></div>
-      <div class="overlay" aria-live="off">
+      <div class="overlay" aria-live="off" data-overlay>
         <div class="ov-top"><span class="ov-event"></span><span class="ov-match"></span><span></span></div>
         <div class="ov-main">
           <div class="ov-alliance blue"><div class="ov-bonus" data-bonus="blue"></div><div class="ov-teams"><span>—</span><span>—</span></div><div class="ov-score" data-score="blue">0</div></div>
@@ -67,21 +111,38 @@ export async function mountGameScreen(root: HTMLElement, options: GameOptions, a
       <div class="game-actions">
         <button class="icon-btn" data-act="pause">Pausar (Esc)</button>
         <button class="icon-btn" data-act="camera">Câmera (C)</button>
+        <button class="icon-btn" data-act="overlay" aria-expanded="false">Placar (V)</button>
+        <div class="panel overlay-settings" data-overlay-settings hidden>
+          <h4>Placar</h4>
+          <fieldset class="seg" aria-label="Modo do placar">
+            ${OVERLAY_MODES.map((m) => `<label><input type="radio" name="ov-mode" value="${m.id}"> ${m.label}</label>`).join("")}
+          </fieldset>
+          <h4>Escala</h4>
+          <div class="seg-buttons" role="group" aria-label="Escala do placar">
+            ${OVERLAY_SCALES.map((s) => `<button type="button" data-scale="${s}">${String(s).replace(".", ",")}×</button>`).join("")}
+          </div>
+          <p class="hint">Na câmera "Seguir robô": arraste para girar, use a roda para aproximar e dê dois cliques para voltar ao padrão. No controle: analógico direito (com R3 para girar).</p>
+        </div>
         <button class="icon-btn" data-act="help">Ajuda</button>
         <button class="icon-btn" data-act="touch">Toque</button>
       </div>
       <div class="hud">
-        <div class="panel">
-          <h4>Robô ${escapeHtml(options.teamNumber)}</h4>
+        <div class="panel robot-panel" data-robot-panel>
+          <button type="button" class="panel-toggle" data-robot-toggle aria-expanded="true" title="Recolher ou mostrar o painel do robô">
+            <h4>Robô ${escapeHtml(options.teamNumber)}</h4><span class="chevron" aria-hidden="true">▾</span>
+          </button>
+          <div class="panel-body">
           <div class="hopper" data-hopper aria-label="Depósito"></div>
           <dl class="kv" style="margin-top:8px">
             <dt>Intake</dt><dd data-intake>parado</dd>
             <dt>Lançador</dt><dd data-launcher></dd>
+            <dt>Rajada</dt><dd data-burst></dd>
             <dt>NECTAR liberado</dt><dd data-nectar></dd>
             <dt>Câmera</dt><dd data-camera></dd>
             <dt>Direção</dt><dd data-drive></dd>
             <dt>FPS</dt><dd data-fps></dd>
           </dl>
+          </div>
         </div>
         <div class="panel fouls" data-fouls hidden></div>
       </div>
@@ -91,12 +152,13 @@ export async function mountGameScreen(root: HTMLElement, options: GameOptions, a
           <tr><td>W A S D</td><td>mover</td></tr>
           <tr><td>Q / E</td><td>girar</td></tr>
           <tr><td>Espaço</td><td>intake (segurar)</td></tr>
-          <tr><td>F</td><td>lançar (HIVE)</td></tr>
+          <tr><td>F</td><td>lançar tudo em rajada (HIVE)</td></tr>
           <tr><td>G</td><td>colocar (FLOWER)</td></tr>
           <tr><td>↑ ↓ / ← →</td><td>velocidade / ângulo</td></tr>
           <tr><td>N</td><td>HUMAN PLAYER: NECTAR</td></tr>
-          <tr><td>C · O · R</td><td>câmera · direção · reiniciar</td></tr>
-          <tr><td>Gamepad</td><td>analógicos, LT coleta, RT lança, RB coloca, Y NECTAR</td></tr>
+          <tr><td>C · O · R · V</td><td>câmera · direção · reiniciar · placar</td></tr>
+          <tr><td>Mouse</td><td>câmera do robô: arrastar gira, roda aproxima</td></tr>
+          <tr><td>Gamepad</td><td>analógicos, LT coleta, RT lança, RB coloca, Y NECTAR; analógico direito ↕ inclina a câmera do robô, R3 + ↔ gira</td></tr>
         </table>
       </div>
       <div class="touch ${isTouch ? "show" : ""}" data-touch>
@@ -185,6 +247,50 @@ export async function mountGameScreen(root: HTMLElement, options: GameOptions, a
     );
   };
 
+  // Placar: modo, escala e transparência automática sobre a HIVE
+  const overlayEl = q("[data-overlay]");
+  const settingsEl = q("[data-overlay-settings]");
+  const hud = loadHudPrefs();
+  const applyOverlay = () => {
+    overlayEl.dataset.mode = hud.mode;
+    overlayEl.style.setProperty("--ov-scale", String(hud.scale));
+    settingsEl.querySelectorAll<HTMLInputElement>('input[name="ov-mode"]').forEach((r) => (r.checked = r.value === hud.mode));
+    settingsEl.querySelectorAll<HTMLButtonElement>("[data-scale]").forEach((b) => b.setAttribute("aria-pressed", String(Number(b.dataset.scale) === hud.scale)));
+    saveHudPrefs(hud);
+  };
+  const cycleOverlayMode = () => {
+    const i = OVERLAY_MODES.findIndex((m) => m.id === hud.mode);
+    hud.mode = OVERLAY_MODES[(i + 1) % OVERLAY_MODES.length].id;
+    applyOverlay();
+  };
+  settingsEl.querySelectorAll<HTMLInputElement>('input[name="ov-mode"]').forEach((r) =>
+    r.addEventListener("change", () => {
+      hud.mode = r.value as OverlayMode;
+      applyOverlay();
+    }),
+  );
+  settingsEl.querySelectorAll<HTMLButtonElement>("[data-scale]").forEach((b) =>
+    b.addEventListener("click", () => {
+      hud.scale = Number(b.dataset.scale) as OverlayScale;
+      applyOverlay();
+    }),
+  );
+  applyOverlay();
+
+  // Painel do robô recolhível (fica só o título, para liberar a tela)
+  const robotPanel = q("[data-robot-panel]");
+  const robotToggle = q<HTMLButtonElement>("[data-robot-toggle]");
+  const applyRobotPanel = () => {
+    robotPanel.classList.toggle("collapsed", hud.robotPanelCollapsed);
+    robotToggle.setAttribute("aria-expanded", String(!hud.robotPanelCollapsed));
+    saveHudPrefs(hud);
+  };
+  robotToggle.addEventListener("click", () => {
+    hud.robotPanelCollapsed = !hud.robotPanelCollapsed;
+    applyRobotPanel();
+  });
+  applyRobotPanel();
+
   const toastArea = q(".toast-area");
   let lastToasts = "";
   const onView = (view: GameView) => {
@@ -202,6 +308,7 @@ export async function mountGameScreen(root: HTMLElement, options: GameOptions, a
       .join("");
     q("[data-intake]").textContent = view.intakeOn ? "coletando" : "parado";
     q("[data-launcher]").textContent = `${view.launcherSpeed.toFixed(1)} m/s · ${Math.round(view.launcherPitch)}°`;
+    q("[data-burst]").textContent = `${view.launchIntervalS.toFixed(2).replace(".", ",")} s entre bolas${view.bursting ? " · lançando…" : ""}`;
     q("[data-nectar]").textContent = `${view.nectarAvailable} de ${view.nectarInArea} na área`;
     q("[data-camera]").textContent = view.cameraLabel;
     q("[data-drive]").textContent = view.relativeDrive ? "relativa à câmera" : "relativa ao robô";
@@ -211,6 +318,13 @@ export async function mountGameScreen(root: HTMLElement, options: GameOptions, a
     foulsEl.hidden = view.fouls.length === 0;
     foulsEl.innerHTML = `<h4>Faltas</h4>${view.fouls.slice(-3).map((f) => `<div>${f.clock} ${f.rule} — ${escapeHtml(f.text)}</div>`).join("")}`;
 
+    const overlayRect = q(".ov-main").getBoundingClientRect();
+    const stageRect = q(".stage-host").getBoundingClientRect();
+    const hive = view.hiveRect
+      ? { left: view.hiveRect.left + stageRect.left, right: view.hiveRect.right + stageRect.left, top: view.hiveRect.top + stageRect.top, bottom: view.hiveRect.bottom + stageRect.top }
+      : null;
+    overlayEl.classList.toggle("ov-dim", hud.mode !== "hidden" && !!hive && rectsOverlap(hive, overlayRect));
+
     const toasts = view.messages.slice(-3).join("|");
     if (toasts !== lastToasts) {
       lastToasts = toasts;
@@ -218,11 +332,15 @@ export async function mountGameScreen(root: HTMLElement, options: GameOptions, a
     }
   };
 
-  game = await Game.create(q(".stage-host"), options, { onView, onFinished, onPauseRequest: () => (modal.innerHTML ? null : pauseMenu()) });
+  game = await Game.create(q(".stage-host"), options, { onView, onFinished, onPauseRequest: () => (modal.innerHTML ? null : pauseMenu()), onOverlayModeRequest: cycleOverlayMode });
   game.bindTouch(q("[data-touch]"));
 
   root.querySelector('[data-act="pause"]')!.addEventListener("click", pauseMenu);
   root.querySelector('[data-act="camera"]')!.addEventListener("click", () => game?.setCamera());
+  root.querySelector('[data-act="overlay"]')!.addEventListener("click", (e) => {
+    settingsEl.hidden = !settingsEl.hidden;
+    (e.currentTarget as HTMLElement).setAttribute("aria-expanded", String(!settingsEl.hidden));
+  });
   root.querySelector('[data-act="help"]')!.addEventListener("click", () => {
     const help = q("[data-help]");
     help.hidden = !help.hidden;

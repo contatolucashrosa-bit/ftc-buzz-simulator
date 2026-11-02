@@ -16,6 +16,11 @@ export interface ControlState {
   toggleRelative: boolean;
   speedDelta: number;
   pitchDelta: number;
+  /** Ajuste da câmera do robô pelo analógico direito (-1..1): guinada (com R3) e inclinação. */
+  cameraYaw: number;
+  cameraPitch: number;
+  /** Alterna o modo do placar (transmissão → piloto → oculto). */
+  overlayMode: boolean;
 }
 
 const ACTION_KEYS = {
@@ -26,6 +31,7 @@ const ACTION_KEYS = {
   pause: ["Escape", "KeyP"],
   restart: ["KeyR"],
   toggleRelative: ["KeyO"],
+  overlayMode: ["KeyV"],
 } as const;
 
 type EdgeAction = keyof typeof ACTION_KEYS;
@@ -140,8 +146,11 @@ export class Controls {
       pause: edge("pause"),
       restart: edge("restart"),
       toggleRelative: edge("toggleRelative"),
+      overlayMode: edge("overlayMode"),
       speedDelta: 0,
       pitchDelta: 0,
+      cameraYaw: 0,
+      cameraPitch: 0,
     };
 
     // Gamepad padrão: analógico esquerdo move, direito gira; RT lança, RB coloca, LT coleta.
@@ -152,7 +161,10 @@ export class Controls {
       const padEdge = (i: number) => b(i) && !this.prevPad[i];
       moveX += dz(pad.axes[0] ?? 0);
       moveY += -dz(pad.axes[1] ?? 0);
-      turn += -dz(pad.axes[2] ?? 0);
+      // R3 segurado: o analógico direito gira a câmera do robô em vez de girar o robô
+      if (b(11)) state.cameraYaw = -dz(pad.axes[2] ?? 0);
+      else turn += -dz(pad.axes[2] ?? 0);
+      state.cameraPitch = dz(pad.axes[3] ?? 0);
       intakeHeld ||= b(6) || b(4);
       state.launch ||= padEdge(7);
       state.place ||= padEdge(5);

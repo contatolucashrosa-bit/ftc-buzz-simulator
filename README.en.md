@@ -132,11 +132,13 @@ The contents of `dist/` can be published on any free static host, such as GitHub
 | Move | W A S D | left stick |
 | Turn | Q / E | right stick |
 | Intake (hold) | Space | LT or LB |
-| Launch | F | RT |
+| Launch the whole hopper in a burst | F | RT |
 | Place in FLOWER | G | RB |
 | Launcher speed / angle | ↑ ↓ / ← → | D-pad |
 | HUMAN PLAYER: enter NECTAR | N | Y |
 | Camera · drive mode · restart · pause | C · O · R · Esc | Back · — · — · Start |
+| Scoreboard: broadcast → driver → hidden | V | — |
+| "Follow robot" camera: orbit / tilt / zoom | drag the mouse / wheel / double-click resets | right stick ↕ tilts; R3 + ↔ orbits |
 
 ## Disclaimer
 

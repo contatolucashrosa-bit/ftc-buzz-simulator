@@ -132,11 +132,13 @@ O conteúdo de `dist/` pode ser publicado em qualquer hospedagem estática gratu
 | Mover | W A S D | analógico esquerdo |
 | Girar | Q / E | analógico direito |
 | Intake (segurar) | Espaço | LT ou LB |
-| Lançar | F | RT |
+| Lançar todo o depósito em rajada | F | RT |
 | Colocar na FLOWER | G | RB |
 | Velocidade / ângulo do lançador | ↑ ↓ / ← → | direcional |
 | HUMAN PLAYER: introduzir NECTAR | N | Y |
 | Câmera · direção · reiniciar · pausar | C · O · R · Esc | Back · — · — · Start |
+| Placar: transmissão → piloto → oculto | V | — |
+| Câmera "Seguir robô": girar / inclinar / aproximar | arrastar o mouse / roda / duplo clique volta ao padrão | analógico direito ↕ inclina; R3 + ↔ gira |
 
 ## Avisos
 
