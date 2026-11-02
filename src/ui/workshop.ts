@@ -35,7 +35,7 @@ export async function mountWorkshop(host: HTMLElement): Promise<() => void> {
         <div class="field"><label for="ws-name">Nome</label><input id="ws-name" type="text" maxlength="40" value="Meu robô"></div>
         <div class="field"><label for="ws-unit">Unidade do arquivo</label><select id="ws-unit">${UNITS.map(([v, l]) => `<option value="${v}">${l}</option>`).join("")}</select><small>Detectada pelo tamanho; troque se o robô ficar gigante ou minúsculo.</small></div>
         <div class="field"><label for="ws-up">Eixo para cima no arquivo</label><select id="ws-up"><option value="z">Z (STEP, STL, Onshape, SolidWorks)</option><option value="y">Y (GLB, Blender)</option><option value="x">X</option></select></div>
-        <div class="field"><span class="label">Frente do robô</span><button type="button" class="btn btn-secondary btn-small" data-rotate>Girar 90°</button><small>Gire até a seta apontar para o intake.</small></div>
+        <div class="field"><span class="label">Frente do robô</span><button type="button" class="btn btn-secondary btn-small" data-rotate>Girar 90°</button> <button type="button" class="btn btn-secondary btn-small" data-top>Ver de cima</button><small>Gire até a seta apontar para o intake. A vista de cima ajuda a conferir.</small></div>
         <div class="field"><label for="ws-preset">Mecanismos (física)</label><select id="ws-preset">${ROBOT_PRESET_IDS.map((id) => `<option value="${id}">${ROBOT_PRESETS[id].label}</option>`).join("")}</select><small>Tração, intake, lançador e retirada na FLOWER que o jogo vai simular com o seu modelo.</small></div>
         <dl class="kv" data-size></dl>
         <button class="btn btn-primary" type="submit" data-save disabled>Guardar robô</button>
@@ -140,7 +140,7 @@ export async function mountWorkshop(host: HTMLElement): Promise<() => void> {
       fileName = file.name;
       yawQuarter = 0;
       unit.value = String(guessScale(cad.raw));
-      up.value = guessUp(file.name);
+      up.value = cad.up ?? guessUp(file.name);
       nameInput.value = file.name.replace(/\.[^.]+$/, "").slice(0, 40);
       refresh();
       q("[data-drop]").classList.add("loaded");
@@ -160,6 +160,13 @@ export async function mountWorkshop(host: HTMLElement): Promise<() => void> {
   });
   unit.addEventListener("change", refresh);
   up.addEventListener("change", refresh);
+  let topView = false;
+  q("[data-top]").addEventListener("click", () => {
+    topView = !topView;
+    camera.position.set(topView ? 0.001 : 0.75, topView ? 1.3 : 0.55, topView ? 0 : 0.75);
+    orbit.target.set(0, topView ? 0 : 0.15, 0);
+    q("[data-top]").textContent = topView ? "Ver em 3D" : "Ver de cima";
+  });
   q("[data-rotate]").addEventListener("click", () => {
     yawQuarter = (yawQuarter + 1) % 4;
     refresh();

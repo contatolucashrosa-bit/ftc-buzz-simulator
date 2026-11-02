@@ -29,9 +29,26 @@ export interface ImportedCad {
   raw: THREE.Object3D;
   triangles: number;
   note: string;
+  /** Eixo para cima, quando o arquivo informa (GLB do nosso conversor mantém os eixos do CAD: Z para cima). */
+  up?: UpAxis;
 }
 
 const extension = (name: string) => name.toLowerCase().split(".").pop() ?? "";
+
+/**
+ * Sombreamento por face: depois da simplificação (vértices unidos), as normais suavizadas deixavam
+ * as peças com aparência "derretida"; por face, as quinas ficam nítidas como no CAD.
+ */
+function useFlatShading(root: THREE.Object3D): void {
+  root.traverse((o) => {
+    const mesh = o as THREE.Mesh;
+    if (!mesh.isMesh) return;
+    for (const m of Array.isArray(mesh.material) ? mesh.material : [mesh.material]) {
+      (m as THREE.MeshStandardMaterial).flatShading = true;
+      m.needsUpdate = true;
+    }
+  });
+}
 
 export function isSupportedCad(name: string): boolean {
   return ["glb", "stl", "step", "stp"].includes(extension(name));
@@ -42,9 +59,12 @@ export async function readCadFile(file: File, onProgress?: (text: string) => voi
   const data = await file.arrayBuffer();
   let raw: THREE.Object3D;
   let note = "";
+  let up: UpAxis | undefined;
   if (ext === "glb") {
     const gltf = await new GLTFLoader().parseAsync(data, "");
     raw = gltf.scene;
+    if (String(gltf.asset?.generator ?? "").includes("step-to-glb")) up = "z";
+    useFlatShading(raw);
   } else if (ext === "stl") {
     const geometry = new STLLoader().parse(data);
     geometry.computeVertexNormals();
@@ -68,7 +88,7 @@ export async function readCadFile(file: File, onProgress?: (text: string) => voi
     const g = mesh.geometry;
     triangles += (g.index ? g.index.count : g.attributes.position.count) / 3;
   });
-  return { raw, triangles: Math.round(triangles), note };
+  return { raw, triangles: Math.round(triangles), note, up };
 }
 
 async function readStep(bytes: Uint8Array): Promise<THREE.Object3D> {
@@ -184,6 +204,7 @@ export async function bakeToGlb(model: THREE.Object3D): Promise<{ glb: ArrayBuff
 /** Lê um modelo guardado (GLB normalizado) para usar no jogo. */
 export async function loadStoredModel(glb: ArrayBuffer): Promise<THREE.Group> {
   const gltf = await new GLTFLoader().parseAsync(glb, "");
+  useFlatShading(gltf.scene);
   gltf.scene.traverse((o) => {
     const mesh = o as THREE.Mesh;
     if (mesh.isMesh) {
