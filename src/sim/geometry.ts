@@ -112,8 +112,10 @@ export const FLOWER = {
   // suposição: o furo do anel do meio deixa passar POLLEN (2.8) e segura NECTAR (3.6);
   // 3.3 pol dá folga para o POLLEN cair até o anel de baixo quando o de baixo é retirado
   middleRingHoleRadius: 3.3 / 2,
-  middleRingThickness: 0.5,
-  pipeRadius: 0.42,
+  // Do CAD oficial da arena (am-5850): o volume de pontuação tem 426,7 mm (16,8 pol) de altura, então o anel
+  // do meio termina a 21,5 − 16,8 = 4,7 pol; os canos HIPS têm Ø 26,5 mm (1,04 pol).
+  middleRingThickness: 0.75,
+  pipeRadius: 0.52,
   /** Volume de pontuação: entre o anel do meio e o anel do topo (§10.5.2, CAD Reference 10-4). */
   get scoringBottom(): number {
     return this.lowerRingHeight + this.retrievalHeight + this.middleRingThickness;
