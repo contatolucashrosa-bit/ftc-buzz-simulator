@@ -1,0 +1,533 @@
+// Buzz Simulator — Criado por Lucas Hochmann Rosa (https://github.com/contatolucashrosa-bit), em parceria com WestSharksFTC #24823.
+// Controlador da partida: liga física, regras, robô, entradas e placar.
+import * as THREE from "three";
+import { RULES, type Alliance } from "../rules/rules";
+import { clockAt, formatClock, matchDuration, nectarAllowance, type ClockState } from "../match/clock";
+import { computeScore, emptySnapshot, type MatchScore, type MatchSnapshot } from "../scoring/scoring";
+import { Controls, type ControlState } from "../input/controls";
+import { Stage, QUALITY_SETTINGS, CAMERA_LABELS, type Quality } from "../render/stage";
+import { createWorld, initPhysics, type PhysicsWorld } from "../sim/physics";
+import { buildField, ALLIANCE_COLORS } from "../sim/field";
+import { ElementManager, allianceOfNectar, nectarOf } from "../sim/elements";
+import { Hive } from "../sim/hive";
+import { Flower } from "../sim/flower";
+import { Robot, DEFAULT_ROBOT } from "../sim/robot";
+import { ELEMENTS, FIELD, FLOWERS, GARDENS, HIVE, LOADING_ZONES, circleTouchesRect } from "../sim/geometry";
+import { AutoRunner, buildAutoSteps, RED_START, type AutoProgramId } from "./autonomous";
+
+export type GameMode = "practice" | "match";
+
+export interface GameOptions {
+  mode: GameMode;
+  quality: Quality;
+  autoProgram: AutoProgramId;
+  teamNumber: string;
+  eventName: string;
+  matchLabel: string;
+}
+
+export interface FoulEntry {
+  rule: string;
+  alliance: Alliance;
+  penalty: "minor" | "major";
+  text: string;
+  clock: string;
+}
+
+export interface GameView {
+  mode: GameMode;
+  started: boolean;
+  paused: boolean;
+  clock: ClockState;
+  clockText: string;
+  phaseLabel: string;
+  score: MatchScore;
+  hopper: string[];
+  intakeOn: boolean;
+  launcherSpeed: number;
+  launcherPitch: number;
+  nectarAvailable: number;
+  nectarInArea: number;
+  cameraLabel: string;
+  relativeDrive: boolean;
+  fouls: FoulEntry[];
+  messages: string[];
+  fps: number;
+  settling: boolean;
+  teamNumber: string;
+  eventName: string;
+  matchLabel: string;
+}
+
+export interface GameCallbacks {
+  onView(view: GameView): void;
+  onFinished(view: GameView): void;
+  onPauseRequest(): void;
+}
+
+interface NectarPool {
+  /** NECTAR inicial ainda na ALLIANCE AREA (5 no começo, §10.3.1). */
+  staged: number;
+  introducedFromStaging: number;
+  /** NECTAR que saiu do campo e voltou à equipe: pode reentrar a qualquer momento (G426). */
+  returned: number;
+}
+
+const SETTLE_SECONDS = 3; // apuração depois que tudo para (§10.5)
+const PHASE_LABELS = { pre: "Pronto", auto: "AUTO", transition: "Transição", teleop: "TELEOP", post: "Fim" } as const;
+
+export class Game {
+  private readonly stage: Stage;
+  private readonly physics: PhysicsWorld;
+  private readonly elements: ElementManager;
+  private readonly hives: Record<Alliance, Hive>;
+  private readonly flowers: Flower[];
+  private readonly robot: Robot;
+  private readonly controls = new Controls();
+  private readonly auto: AutoRunner;
+
+  private started = false;
+  private paused = false;
+  private finished = false;
+  private elapsed = 0; // segundos de partida (simulação)
+  private accumulator = 0;
+  private settleTimer = 0;
+  private lastFrame = 0;
+  private raf = 0;
+  private relativeDrive = true;
+  private lastViewAt = 0;
+  private fpsFrames = 0;
+  private fpsTime = 0;
+  private fps = 0;
+  private lastControls: ControlState | null = null;
+
+  private readonly tips: Record<Alliance, { auto: number; teleop: number }> = { red: { auto: 0, teleop: 0 }, blue: { auto: 0, teleop: 0 } };
+  private readonly pools: Record<Alliance, NectarPool> = {
+    red: { staged: 5, introducedFromStaging: 0, returned: 0 },
+    blue: { staged: 5, introducedFromStaging: 0, returned: 0 },
+  };
+  private autoResult: { leave: boolean; park: boolean } | null = null;
+  private readonly fouls: FoulEntry[] = [];
+  private readonly messages: Array<{ text: string; until: number }> = [];
+  private finalScore: MatchScore | null = null;
+
+  static async create(container: HTMLElement, options: GameOptions, callbacks: GameCallbacks): Promise<Game> {
+    await initPhysics();
+    return new Game(container, options, callbacks);
+  }
+
+  private constructor(
+    container: HTMLElement,
+    readonly options: GameOptions,
+    private readonly callbacks: GameCallbacks,
+  ) {
+    const quality = QUALITY_SETTINGS[options.quality];
+    this.stage = new Stage(container, options.quality, "red");
+    this.physics = createWorld(1 / quality.physicsHz);
+    buildField(this.physics, this.stage.scene);
+    this.elements = new ElementManager(this.physics, this.stage.scene, quality.sphereSegments);
+    this.hives = {
+      red: new Hive("red", this.physics, this.stage.scene, ALLIANCE_COLORS.red),
+      blue: new Hive("blue", this.physics, this.stage.scene, ALLIANCE_COLORS.blue),
+    };
+    this.flowers = FLOWERS.map((spec) => new Flower(spec, this.physics, this.stage.scene));
+    this.robot = new Robot(
+      { ...DEFAULT_ROBOT, alliance: "red", teamNumber: options.teamNumber, start: RED_START },
+      this.physics,
+      this.stage.scene,
+    );
+    this.auto = new AutoRunner(options.mode === "match" ? buildAutoSteps(options.autoProgram) : []);
+    this.stageElements();
+    if (options.mode === "practice") this.started = true;
+
+    this.lastFrame = performance.now();
+    this.raf = requestAnimationFrame(this.frame);
+    // Só em desenvolvimento: permite inspecionar o estado pelo console do navegador.
+    if (import.meta.env.DEV) (window as unknown as { __buzz?: unknown }).__buzz = this.debugHandle();
+  }
+
+  private debugHandle() {
+    return {
+      elements: () => this.elements.elements.map((e) => ({ kind: e.kind, ...this.elements.position(e) })),
+      hives: () => Object.fromEntries((["red", "blue"] as const).map((a) => [a, { upSide: this.hives[a].logic.upSide, tipping: this.hives[a].logic.tipping, inUpCell: this.hives[a].elementsInUpCell(this.elements).length }])),
+      flowers: () => this.flowers.map((f) => ({ id: f.spec.id, stack: f.stack(this.elements).stack })),
+      robot: () => ({ ...this.robot.pose(), hopper: [...this.robot.hopper], touchingWall: this.robot.touchingWall(), inLZ: this.robot.partiallyIn(LOADING_ZONES.red) }),
+      tips: () => this.tips,
+      view: () => this.view(),
+      teleport: (x: number, y: number, heading: number) => {
+        const p = new THREE.Vector3(x * 0.0254, 0.07, -y * 0.0254);
+        this.robot.body.setTranslation(p, true);
+        this.robot.body.setRotation({ x: 0, y: Math.sin(heading / 2), z: 0, w: Math.cos(heading / 2) }, true);
+      },
+      aim: (speed: number, pitch: number) => {
+        this.robot.launcherSpeed = speed;
+        this.robot.launcherPitchDeg = pitch;
+      },
+      launch: () => this.robot.launch(this.elements, true),
+      place: () => this.robot.place(this.elements, true),
+      give: (kind: "pollen" | "redNectar") => this.robot.hopper.push(kind),
+      camera: (mode: "audience" | "driver" | "follow" | "top" | "free") => this.stage.setCamera(mode),
+      skipTo: (elapsedSeconds: number) => (this.elapsed = elapsedSeconds),
+    };
+  }
+
+  bindTouch(root: HTMLElement): void {
+    this.controls.bindTouch(root);
+  }
+
+  /** Coloca os elementos nas posições iniciais (§10.3.1 p.81–82). */
+  private stageElements(): void {
+    const { pollenRadius: rp, nectarRadius: rn } = ELEMENTS;
+    for (const flower of this.flowers) {
+      for (const p of flower.stagingPositions()) this.elements.spawn("pollen", p.x, p.y, p.z);
+    }
+    // GARDEN: em linha a partir do canto mais perto da ALLIANCE AREA, encostado na parede
+    for (let i = 0; i < 4; i++) {
+      this.elements.spawn("pollen", GARDENS.red.xMin + rp + 0.05 + i * (2 * rp + 0.05), -FIELD.half + rp + 0.05, rp + 0.02);
+      this.elements.spawn("pollen", GARDENS.blue.xMax - rp - 0.05 - i * (2 * rp + 0.05), FIELD.half - rp - 0.05, rp + 0.02);
+    }
+    // 3 NECTAR na CELL de cima: encostados no fundo, em linha junto à lateral do lado da aliança
+    for (const alliance of ["red", "blue"] as const) {
+      const hive = this.hives[alliance];
+      const side = hive.logic.upSide;
+      const lateral = alliance === "red" ? -1 : 1;
+      for (let i = 0; i < 3; i++) {
+        const p = hive.localToField(
+          lateral * (HIVE.cellWidth / 2 - rn - 0.3),
+          side * (HIVE.cellInnerY + rn + 0.3 + i * (2 * rn + 0.15)),
+          HIVE.cellBottomZ + rn + 0.6,
+        );
+        this.elements.spawn(nectarOf(alliance), p.x, p.y, p.z);
+      }
+    }
+    // Pré-carga do nosso robô: 4 POLLEN no depósito (G304.G)
+    this.robot.hopper.push("pollen", "pollen", "pollen", "pollen");
+    // Robôs ausentes: POLLEN no centro da LOADING ZONE, contra a parede (§10.3.1)
+    const absent: Array<[Alliance, number]> = [["red", 1], ["blue", 2]];
+    for (const [alliance, robots] of absent) {
+      const lz = LOADING_ZONES[alliance];
+      const wallX = alliance === "red" ? lz.xMin + rp + 0.1 : lz.xMax - rp - 0.1;
+      const inward = alliance === "red" ? 1 : -1;
+      const cy = (lz.yMin + lz.yMax) / 2;
+      for (let r = 0; r < robots; r++) {
+        for (let i = 0; i < 4; i++) {
+          this.elements.spawn("pollen", wallX + inward * r * (2 * rp + 0.1), cy + (i - 1.5) * (2 * rp + 0.1), rp + 0.02);
+        }
+      }
+    }
+  }
+
+  startMatch(): void {
+    if (this.options.mode === "match" && !this.started) {
+      this.started = true;
+      this.elapsed = 0;
+      this.flash("Partida iniciada: AUTO de 30 s");
+    }
+  }
+
+  setPaused(paused: boolean): void {
+    this.paused = paused;
+    this.lastFrame = performance.now();
+  }
+
+  setCamera(): void {
+    this.stage.cycleCamera();
+  }
+
+  private flash(text: string, seconds = 3): void {
+    this.messages.push({ text, until: performance.now() + seconds * 1000 });
+  }
+
+  private clock(): ClockState {
+    if (this.options.mode === "practice") {
+      return { phase: "teleop", displaySeconds: this.elapsed, matchSecondsRemaining: 999, flowerUnlocked: true, robotsEnabled: true, driverControl: true };
+    }
+    if (!this.started) return clockAt(-1);
+    return clockAt(this.elapsed);
+  }
+
+  private readonly frame = (now: number) => {
+    this.raf = requestAnimationFrame(this.frame);
+    const realDt = Math.min(0.1, (now - this.lastFrame) / 1000);
+    this.lastFrame = now;
+
+    this.fpsFrames++;
+    this.fpsTime += realDt;
+    if (this.fpsTime >= 0.5) {
+      this.fps = Math.round(this.fpsFrames / this.fpsTime);
+      this.fpsFrames = 0;
+      this.fpsTime = 0;
+    }
+
+    const input = this.controls.poll();
+    this.lastControls = input;
+    if (input.pause) this.callbacks.onPauseRequest();
+    if (input.camera) this.stage.cycleCamera();
+    if (input.toggleRelative) {
+      this.relativeDrive = !this.relativeDrive;
+      this.flash(this.relativeDrive ? "Direção relativa à câmera" : "Direção relativa ao robô");
+    }
+
+    if (!this.paused && !this.finished) {
+      // ajustes do lançador (contínuos enquanto a tecla estiver pressionada)
+      this.robot.launcherSpeed = Math.min(10, Math.max(2, this.robot.launcherSpeed + input.speedDelta * 2.5 * realDt));
+      this.robot.launcherPitchDeg = Math.min(80, Math.max(10, this.robot.launcherPitchDeg + input.pitchDelta * 30 * realDt));
+
+      this.accumulator += realDt;
+      const dt = this.physics.dt;
+      let steps = 0;
+      let launchPending = input.launch;
+      let placePending = input.place;
+      let nectarPending = input.nectar;
+      while (this.accumulator >= dt && steps < 8) {
+        this.fixedStep(dt, input, launchPending, placePending, nectarPending);
+        launchPending = placePending = nectarPending = false;
+        this.accumulator -= dt;
+        steps++;
+      }
+      if (steps === 8) this.accumulator = 0;
+    }
+
+    this.elements.sync();
+    this.robot.sync(this.clock().driverControl || this.options.mode === "practice");
+    for (const hive of Object.values(this.hives)) hive.syncVisual();
+    const t = this.robot.body.translation();
+    this.stage.update({ position: new THREE.Vector3(t.x, t.y, t.z), heading: this.robot.pose().heading });
+    this.stage.render();
+
+    if (now - this.lastViewAt > 100) {
+      this.lastViewAt = now;
+      this.callbacks.onView(this.view());
+    }
+  };
+
+  private fixedStep(dt: number, input: ControlState, launch: boolean, place: boolean, nectar: boolean): void {
+    const before = this.clock();
+    const matchRunning = this.started && before.phase !== "pre";
+
+    // Comandos do robô: programa no AUTO, piloto no TELEOP
+    let command = { forward: 0, strafe: 0, turn: 0 };
+    if (before.phase === "auto" && this.options.mode === "match") {
+      command = this.auto.update(dt, {
+        pose: () => this.robot.pose(),
+        setAim: (speed, pitch) => {
+          this.robot.launcherSpeed = speed;
+          this.robot.launcherPitchDeg = pitch;
+        },
+        launch: () => this.robot.launch(this.elements, true) !== null,
+      });
+      this.robot.intakeOn = false;
+    } else if (before.driverControl) {
+      command = this.driverCommand(input);
+      this.robot.intakeOn = input.intakeHeld;
+      if (launch) this.robot.launch(this.elements, true);
+      if (place) this.robot.place(this.elements, true);
+    } else {
+      this.robot.intakeOn = false;
+    }
+    this.robot.drive(command, dt, before.robotsEnabled && matchRunning);
+    this.robot.updateIntake(this.elements, before.robotsEnabled && matchRunning);
+
+    if (nectar) this.introduceNectar("red", before);
+
+    this.physics.world.step();
+    if (matchRunning && !this.finished) this.elapsed += dt;
+    const after = this.clock();
+
+    for (const alliance of ["red", "blue"] as const) {
+      if (this.hives[alliance].step(dt, this.elements)) {
+        // TIP concluído antes do início do TELEOP conta como AUTO (§10.5.B)
+        const isAuto = this.options.mode === "match" && (after.phase === "auto" || after.phase === "transition");
+        this.tips[alliance][isAuto ? "auto" : "teleop"]++;
+        this.flash(`HIVE ${alliance === "red" ? "vermelha" : "azul"} virou! +${RULES.points.teleopHiveTip} pontos e +1 NECTAR liberado`);
+      }
+    }
+
+    this.checkEarlyNectarInFlowers(after);
+    this.handleOutOfField();
+
+    if (this.options.mode === "match") {
+      if (before.phase === "auto" && after.phase !== "auto") {
+        // LEAVE e PARK do AUTO são avaliados no fim do AUTO (§10.5.F)
+        this.autoResult = { leave: !this.robot.touchingWall(), park: this.robot.partiallyIn(LOADING_ZONES.red) };
+        this.flash("Fim do AUTO: robôs parados por 8 s (G403)");
+      }
+      if (before.phase === "transition" && after.phase === "teleop") this.flash("TELEOP: pilotos no controle!");
+      if (before.phase === "teleop" && before.matchSecondsRemaining > RULES.flowerUnlockClock && after.flowerUnlocked) {
+        this.flash("1:00 — FLOWERS liberadas e todo o NECTAR pode entrar!", 4);
+      }
+      if (after.phase === "post" && !this.finished) {
+        this.settleTimer += dt;
+        if (this.settleTimer >= SETTLE_SECONDS) this.finish();
+      }
+    }
+  }
+
+  /** Converte o comando do piloto em comando do robô (relativo à câmera ou ao robô). */
+  private driverCommand(input: ControlState) {
+    const heading = this.robot.pose().heading;
+    if (!this.relativeDrive) return { forward: input.moveY, strafe: -input.moveX, turn: input.turn };
+    const f = this.stage.forwardOnField();
+    const right = { x: f.y, y: -f.x };
+    const dx = f.x * input.moveY + right.x * input.moveX;
+    const dy = f.y * input.moveY + right.y * input.moveX;
+    return {
+      forward: dx * Math.cos(heading) + dy * Math.sin(heading),
+      strafe: -dx * Math.sin(heading) + dy * Math.cos(heading),
+      turn: input.turn,
+    };
+  }
+
+  private nectarAvailable(alliance: Alliance, clock: ClockState): number {
+    const pool = this.pools[alliance];
+    if (this.options.mode === "practice") return pool.staged + pool.returned;
+    const fromStaging = nectarAllowance({
+      inAllianceArea: pool.staged,
+      alreadyIntroducedFromStaging: pool.introducedFromStaging,
+      ownHiveTips: this.tips[alliance].auto + this.tips[alliance].teleop,
+      matchSecondsRemaining: clock.matchSecondsRemaining,
+      phase: clock.phase,
+    });
+    return fromStaging + (clock.phase === "pre" || clock.phase === "post" ? 0 : pool.returned);
+  }
+
+  /** HUMAN PLAYER introduz NECTAR pela LOADING ZONE (G426, G427). */
+  private introduceNectar(alliance: Alliance, clock: ClockState): void {
+    const pool = this.pools[alliance];
+    if (this.nectarAvailable(alliance, clock) <= 0) {
+      this.flash("Ainda não há NECTAR liberado (G426: 1 por TIP da sua HIVE, ou todos com 1:00 restante)");
+      return;
+    }
+    if (pool.returned > 0) pool.returned--;
+    else {
+      pool.staged--;
+      pool.introducedFromStaging++;
+    }
+    const lz = LOADING_ZONES[alliance];
+    const x = alliance === "red" ? lz.xMin + 3 : lz.xMax - 3;
+    this.elements.spawn(nectarOf(alliance), x, (lz.yMin + lz.yMax) / 2, 8);
+    this.flash("NECTAR introduzido na LOADING ZONE");
+  }
+
+  /** G410: NECTAR no volume da FLOWER antes de 1:00 restante → MAJOR FOUL por NECTAR. */
+  private checkEarlyNectarInFlowers(clock: ClockState): void {
+    if (clock.flowerUnlocked || this.options.mode === "practice") return;
+    for (const flower of this.flowers) {
+      for (const e of flower.stack(this.elements).members) {
+        if (!allianceOfNectar(e.kind) || e.earlyFlowerFoul || !e.lastLaunchedBy) continue;
+        e.earlyFlowerFoul = true;
+        this.fouls.push({
+          rule: "G410",
+          alliance: e.lastLaunchedBy,
+          penalty: "major",
+          text: "NECTAR na FLOWER antes de 1:00 restante",
+          clock: formatClock(clock.displaySeconds),
+        });
+        this.flash("MAJOR FOUL (G410): NECTAR na FLOWER antes de 1:00", 4);
+      }
+    }
+  }
+
+  /** Elementos fora do campo: POLLEN volta pelo staff; NECTAR volta para a equipe (§10.8.2). */
+  private handleOutOfField(): void {
+    const now = this.elapsed;
+    for (const e of [...this.elements.elements]) {
+      const p = this.elements.position(e);
+      const out = Math.abs(p.x) > FIELD.half + 2 || Math.abs(p.y) > FIELD.half + 2 || p.z < -6;
+      if (!out) {
+        e.outSince = null;
+        continue;
+      }
+      e.outSince ??= now;
+      if (now - e.outSince < 1.5 && p.z > -6) continue;
+      const owner = allianceOfNectar(e.kind);
+      this.elements.remove(e);
+      if (owner) {
+        this.pools[owner].returned++;
+        if (owner === "red") this.flash("NECTAR saiu do campo e voltou para o HUMAN PLAYER");
+      } else {
+        const inside = FIELD.half - ELEMENTS.pollenRadius - 0.5;
+        this.elements.spawn("pollen", Math.max(-inside, Math.min(inside, p.x)), Math.max(-inside, Math.min(inside, p.y)), 4);
+      }
+    }
+  }
+
+  /** Monta o retrato da partida para o motor de pontuação. */
+  private snapshot(): MatchSnapshot {
+    const s = emptySnapshot();
+    const clock = this.clock();
+    for (const alliance of ["red", "blue"] as const) {
+      const a = s[alliance];
+      a.autoHiveTips = this.tips[alliance].auto;
+      a.teleopHiveTips = this.tips[alliance].teleop;
+      a.cellElements = this.hives[alliance].elementsInUpCell(this.elements).length;
+      a.gardenElements = this.elements.elements.filter((e) => {
+        const p = this.elements.position(e);
+        return circleTouchesRect(p.x, p.y, e.radius, GARDENS[alliance]);
+      }).length;
+      a.majorFouls = this.fouls.filter((f) => f.alliance === alliance && f.penalty === "major").length;
+      a.minorFouls = this.fouls.filter((f) => f.alliance === alliance && f.penalty === "minor").length;
+    }
+    if (this.options.mode === "match") {
+      const autoNow = clock.phase === "auto" ? { leave: !this.robot.touchingWall(), park: this.robot.partiallyIn(LOADING_ZONES.red) } : this.autoResult;
+      if (autoNow) {
+        s.red.autoLeave = [autoNow.leave, false];
+        s.red.autoPark = [autoNow.park, false];
+      }
+      if (clock.phase === "teleop" || clock.phase === "post") s.red.teleopPark = [this.robot.partiallyIn(LOADING_ZONES.red), false];
+    } else {
+      s.red.teleopPark = [this.robot.partiallyIn(LOADING_ZONES.red), false];
+    }
+    for (const flower of this.flowers) s.flowers[flower.spec.id] = flower.stack(this.elements).stack;
+    return s;
+  }
+
+  private finish(): void {
+    this.finished = true;
+    this.finalScore = computeScore(this.snapshot());
+    this.callbacks.onFinished(this.view());
+  }
+
+  view(): GameView {
+    const clock = this.clock();
+    const score = this.finalScore ?? computeScore(this.snapshot());
+    const now = performance.now();
+    while (this.messages.length > 0 && this.messages[0].until < now) this.messages.shift();
+    const practice = this.options.mode === "practice";
+    return {
+      mode: this.options.mode,
+      started: this.started,
+      paused: this.paused,
+      clock,
+      clockText: practice ? formatClock(Math.floor(this.elapsed)) : formatClock(clock.displaySeconds),
+      phaseLabel: practice ? "Treino livre" : PHASE_LABELS[clock.phase],
+      score,
+      hopper: [...this.robot.hopper],
+      intakeOn: this.robot.intakeOn || !!this.lastControls?.intakeHeld,
+      launcherSpeed: this.robot.launcherSpeed,
+      launcherPitch: this.robot.launcherPitchDeg,
+      nectarAvailable: this.nectarAvailable("red", clock),
+      nectarInArea: this.pools.red.staged + this.pools.red.returned,
+      cameraLabel: CAMERA_LABELS[this.stage.mode],
+      relativeDrive: this.relativeDrive,
+      fouls: [...this.fouls],
+      messages: this.messages.map((m) => m.text),
+      fps: this.fps,
+      settling: clock.phase === "post" && !this.finished,
+      teamNumber: this.options.teamNumber,
+      eventName: this.options.eventName,
+      matchLabel: this.options.matchLabel,
+    };
+  }
+
+  /** Tempo total previsto da partida (para a barra de progresso). */
+  static readonly duration = matchDuration();
+
+  dispose(): void {
+    cancelAnimationFrame(this.raf);
+    this.controls.dispose();
+    this.elements.dispose();
+    this.stage.dispose();
+    this.physics.world.free();
+  }
+}
