@@ -13,7 +13,8 @@
     "test": "vitest run",
     "typecheck": "tsc --noEmit",
     "java:libs": "node scripts/build-java-libs.mjs",
-    "java:patch-classlib": "node scripts/patch-teavm-classlib.mjs"
+    "java:patch-classlib": "node scripts/patch-teavm-classlib.mjs",
+    "cad:convert": "node --max-old-space-size=12288 scripts/step-to-glb.mjs"
   },
   "dependencies": {
     "@dimforge/rapier3d-compat": "^0.21.0",
