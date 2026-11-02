@@ -7,3 +7,8 @@ dist/
 BIOBUZZ_Competition_Manual.pdf
 tmp-spike/
 .cache/
+# Desenhos e CAD da AndyMark (referência local; redistribuição não confirmada)
+am-58*.pdf
+*.STEP
+*.step
+*.zip
