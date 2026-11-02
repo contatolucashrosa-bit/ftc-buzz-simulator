@@ -5,3 +5,5 @@ dist/
 *.log
 # Manual oficial: material da FIRST, não redistribuído no repositório
 BIOBUZZ_Competition_Manual.pdf
+tmp-spike/
+.cache/
