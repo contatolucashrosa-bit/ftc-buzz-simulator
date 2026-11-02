@@ -1,0 +1,117 @@
+// Buzz Simulator — Criado por Lucas Hochmann Rosa (https://github.com/contatolucashrosa-bit), em parceria com WestSharksFTC #24823.
+// FLOWER (§9.7 p.70): tubo vertical preso à parede. Elementos entram pelo topo; POLLEN sai por baixo.
+// O anel do meio deixa passar POLLEN e segura NECTAR (suposição de diâmetro, ver geometry.ts).
+import * as THREE from "three";
+import type { FlowerElement } from "../scoring/scoring";
+import { FLOWER, INCH, toWorld, type FlowerSpec } from "./geometry";
+import type { ElementManager, GameElement } from "./elements";
+import { RAPIER, type PhysicsWorld } from "./physics";
+
+const CAGE_RADIUS = FLOWER.topOpeningRadius + FLOWER.pipeRadius; // eixo dos canos
+
+export class Flower {
+  constructor(
+    readonly spec: FlowerSpec,
+    physics: PhysicsWorld,
+    scene: THREE.Scene,
+  ) {
+    const body = physics.world.createRigidBody(RAPIER.RigidBodyDesc.fixed());
+    const material = new THREE.MeshStandardMaterial({ color: 0xe8e8e8, roughness: 0.35, metalness: 0.1 });
+    const ringMaterial = new THREE.MeshStandardMaterial({ color: 0xbba13e, roughness: 0.5 }); // dourado BIOBUZZ
+    const group = new THREE.Group();
+    const base = toWorld(spec.x, spec.y, 0);
+    group.position.copy(base);
+    scene.add(group);
+
+    const addBox = (lx: number, ly: number, lz: number, hx: number, hy: number, hz: number, yaw: number, mat: THREE.Material) => {
+      const q = new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(0, 1, 0), yaw);
+      const p = toWorld(spec.x + lx, spec.y + ly, lz);
+      physics.world.createCollider(
+        RAPIER.ColliderDesc.cuboid(hx * INCH, hz * INCH, hy * INCH)
+          .setTranslation(p.x, p.y, p.z)
+          .setRotation({ x: q.x, y: q.y, z: q.z, w: q.w })
+          .setFriction(0.3)
+          .setRestitution(0.1),
+        body,
+      );
+      const mesh = new THREE.Mesh(new THREE.BoxGeometry(hx * 2 * INCH, hz * 2 * INCH, hy * 2 * INCH), mat);
+      mesh.position.copy(p).sub(base);
+      mesh.quaternion.copy(q);
+      group.add(mesh);
+    };
+
+    // Anel aproximado por segmentos retos tangentes (colisor) + um toro (visual).
+    const addRing = (innerRadius: number, width: number, zBottom: number, thickness: number, skipWallSide = false) => {
+      const segments = 12;
+      const mid = innerRadius + width / 2;
+      const half = ((Math.PI * 2 * mid) / segments) * 0.55;
+      for (let i = 0; i < segments; i++) {
+        const a = (i / segments) * Math.PI * 2;
+        const dx = Math.cos(a);
+        const dy = Math.sin(a);
+        if (skipWallSide && dx * -spec.inward.x + dy * -spec.inward.y > 0.7) continue;
+        // yaw em torno do Y do mundo: a tangente do segmento é perpendicular ao raio
+        addBox(dx * mid, dy * mid, zBottom + thickness / 2, half, width / 2, thickness / 2, a + Math.PI / 2, ringMaterial);
+      }
+    };
+
+    // anel de baixo (no piso): o POLLEN fica dentro dele
+    addRing(FLOWER.lowerRingHoleRadius + 0.08, 0.8, 0, FLOWER.lowerRingHeight);
+    // anel do meio: segura NECTAR
+    const middleBottom = FLOWER.lowerRingHeight + FLOWER.retrievalHeight;
+    addRing(FLOWER.middleRingHoleRadius, 1.0, middleBottom, FLOWER.middleRingThickness);
+    // anel do topo
+    addRing(FLOWER.topOpeningRadius, 0.8, FLOWER.topHeight - 0.4, 0.4);
+
+    // 4 canos (HIPS) entre o anel do meio e o do topo
+    const pipeBottom = middleBottom + FLOWER.middleRingThickness;
+    const pipeHalf = (FLOWER.topHeight - pipeBottom) / 2;
+    for (let i = 0; i < 4; i++) {
+      const a = Math.PI / 4 + (i * Math.PI) / 2;
+      const p = toWorld(spec.x + Math.cos(a) * CAGE_RADIUS, spec.y + Math.sin(a) * CAGE_RADIUS, pipeBottom + pipeHalf);
+      physics.world.createCollider(
+        RAPIER.ColliderDesc.cylinder(pipeHalf * INCH, FLOWER.pipeRadius * INCH).setTranslation(p.x, p.y, p.z).setFriction(0.2),
+        body,
+      );
+      const pipe = new THREE.Mesh(new THREE.CylinderGeometry(FLOWER.pipeRadius * INCH, FLOWER.pipeRadius * INCH, pipeHalf * 2 * INCH, 10), material);
+      pipe.position.copy(p).sub(base);
+      group.add(pipe);
+    }
+
+    // perfil quadrado do lado da parede (liga o anel de baixo ao do meio) e o batente do topo
+    const wx = -spec.inward.x;
+    const wy = -spec.inward.y;
+    const wallYaw = Math.atan2(wy, wx);
+    addBox(wx * (CAGE_RADIUS + 0.6), wy * (CAGE_RADIUS + 0.6), pipeBottom / 2, 0.5, 0.5, pipeBottom / 2, wallYaw, material);
+    addBox(
+      wx * (FLOWER.topOpeningRadius + 0.3),
+      wy * (FLOWER.topOpeningRadius + 0.3),
+      FLOWER.topHeight + FLOWER.backstopHeight / 2,
+      0.15,
+      FLOWER.topOpeningRadius,
+      FLOWER.backstopHeight / 2,
+      wallYaw,
+      material,
+    );
+  }
+
+  /** Elemento ao menos parcialmente no volume de pontuação (§10.5.2): entre o anel do meio e o do topo. */
+  isInScoringVolume(elements: ElementManager, e: GameElement): boolean {
+    const p = elements.position(e);
+    const horizontal = Math.hypot(p.x - this.spec.x, p.y - this.spec.y);
+    return horizontal <= FLOWER.topOpeningRadius + 0.3 && p.z + e.radius > FLOWER.scoringBottom && p.z - e.radius < FLOWER.topHeight;
+  }
+
+  /** Pilha de baixo para cima, como a calculadora oficial espera. */
+  stack(elements: ElementManager): { stack: FlowerElement[]; members: GameElement[] } {
+    const members = elements.elements
+      .filter((e) => this.isInScoringVolume(elements, e))
+      .sort((a, b) => elements.position(a).z - elements.position(b).z);
+    return { stack: members.map((e) => e.kind), members };
+  }
+
+  /** Ponto de largada dos 4 POLLEN iniciais (§10.3.1 p.81). */
+  stagingPositions(): Array<{ x: number; y: number; z: number }> {
+    return [0, 1, 2, 3].map((i) => ({ x: this.spec.x, y: this.spec.y, z: 1.45 + i * 2.85 }));
+  }
+}
