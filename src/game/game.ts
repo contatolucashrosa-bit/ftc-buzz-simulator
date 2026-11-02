@@ -11,7 +11,8 @@ import { buildField, ALLIANCE_COLORS } from "../sim/field";
 import { ElementManager, allianceOfNectar, nectarOf } from "../sim/elements";
 import { Hive } from "../sim/hive";
 import { Flower } from "../sim/flower";
-import { Robot, DEFAULT_ROBOT } from "../sim/robot";
+import { Robot, robotConfigFromPreset } from "../sim/robot";
+import { robotPreset, type RobotPresetId } from "../config/robotPresets";
 import { ELEMENTS, FIELD, FLOWERS, GARDENS, HIVE, LOADING_ZONES, circleTouchesRect, toWorld, INCH } from "../sim/geometry";
 import { AutoRunner, buildAutoSteps, RED_START, type AutoProgramId } from "./autonomous";
 
@@ -26,6 +27,7 @@ export interface GameOptions {
   matchLabel: string;
   /** Tempo entre lançamentos na rajada (s); depende do mecanismo do robô. */
   launchIntervalS: number;
+  robotPreset: RobotPresetId;
 }
 
 export interface FoulEntry {
@@ -145,7 +147,7 @@ export class Game {
     };
     this.flowers = FLOWERS.map((spec) => new Flower(spec, this.physics, this.stage.scene));
     this.robot = new Robot(
-      { ...DEFAULT_ROBOT, alliance: "red", teamNumber: options.teamNumber, start: RED_START, launchIntervalS: options.launchIntervalS },
+      { ...robotConfigFromPreset(robotPreset(options.robotPreset)), alliance: "red", teamNumber: options.teamNumber, start: RED_START, launchIntervalS: options.launchIntervalS },
       this.physics,
       this.stage.scene,
     );
@@ -177,7 +179,7 @@ export class Game {
         this.robot.launcherPitchDeg = pitch;
       },
       launch: () => this.robot.launchOne(this.elements, true),
-      place: () => this.robot.place(this.elements, true),
+      place: () => this.robot.flowerAction(this.elements, true),
       give: (kind: "pollen" | "redNectar") => this.robot.hopper.push(kind),
       camera: (mode: "audience" | "driver" | "follow" | "top" | "free") => this.stage.setCamera(mode),
       skipTo: (elapsedSeconds: number) => (this.elapsed = elapsedSeconds),
@@ -430,7 +432,7 @@ export class Game {
       command = this.driverCommand(input);
       this.robot.intakeOn = input.intakeHeld;
       if (launch) this.robot.startBurst(true);
-      if (place) this.robot.place(this.elements, true);
+      if (place) this.robot.flowerAction(this.elements, true);
     } else {
       this.robot.intakeOn = false;
     }

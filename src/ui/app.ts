@@ -7,6 +7,7 @@ import type { Quality } from "../render/stage";
 import { escapeHtml } from "./dom";
 import { ICON_BRAND } from "./icons";
 import { LAUNCH_INTERVAL_LIMITS, clampLaunchInterval as clampInterval } from "../config/robotDefaults";
+import { ROBOT_PRESETS, ROBOT_PRESET_IDS, robotPreset } from "../config/robotPresets";
 
 type Route = "home" | "setup" | "workshop" | "leaderboard" | "teamRobots" | "about";
 
@@ -141,6 +142,11 @@ export class App {
         <span>${AUTO_PROGRAMS[id].label}<small>${AUTO_PROGRAMS[id].description}</small></span></label>`,
       )
       .join("");
+    const robotChoices = ROBOT_PRESET_IDS.map((id) => {
+      const r = ROBOT_PRESETS[id];
+      return `<label class="choice"><input type="radio" name="robot" value="${id}" ${p.robotPreset === id ? "checked" : ""}>
+        <span>${r.label}<small>${r.description}</small></span></label>`;
+    }).join("");
     const qualityOptions = (Object.keys(QUALITY_LABELS) as Quality[])
       .map((q) => `<option value="${q}" ${p.quality === q ? "selected" : ""}>${QUALITY_LABELS[q]}</option>`)
       .join("");
@@ -157,6 +163,11 @@ export class App {
           <input id="event" type="text" maxlength="40" value="${escapeHtml(p.eventName)}">
         </div>
         <fieldset class="field choices">
+          <legend>Robô</legend>
+          ${robotChoices}
+          <small>Variantes inspiradas nos starter bots públicos do BIOBUZZ. Os starter bots não pontuam na FLOWER: só tiram POLLEN dela.</small>
+        </fieldset>
+        <fieldset class="field choices">
           <legend>Programa do AUTO</legend>
           ${autoChoices}
           <small>Programas de exemplo. A importação do seu código Java do Android Studio chega no marco M5.</small>
@@ -164,7 +175,7 @@ export class App {
         <div class="field">
           <label for="interval">Tempo entre lançamentos (s)</label>
           <input id="interval" type="number" inputmode="decimal" min="${LAUNCH_INTERVAL_LIMITS.min}" max="${LAUNCH_INTERVAL_LIMITS.max}" step="0.05" value="${p.launchIntervalS}">
-          <small>Um toque em "lançar" dispara todo o depósito, um elemento após o outro. Este é o tempo que o lançador do seu robô leva para recuperar a velocidade entre duas bolas (padrão 0,30 s). Lançadores com volante mais pesado ou mais motores recuperam mais rápido.</small>
+          <small>Um toque em "lançar" dispara todo o depósito, um elemento após o outro. Este é o tempo que o lançador do seu robô leva para recuperar a velocidade entre duas bolas (cada robô tem seu padrão). Lançadores com volante mais pesado ou mais motores recuperam mais rápido.</small>
         </div>
         <div class="field">
           <label for="quality">Qualidade gráfica</label>
@@ -188,9 +199,16 @@ export class App {
         autoProgram: (form.querySelector<HTMLInputElement>('input[name="auto"]:checked')?.value as AutoProgramId) ?? "leavePark",
         quality: form.querySelector<HTMLSelectElement>("#quality")!.value as Quality,
         launchIntervalS: clampInterval(Number(form.querySelector<HTMLInputElement>("#interval")!.value.replace(",", "."))),
+        robotPreset: robotPreset(form.querySelector<HTMLInputElement>('input[name="robot"]:checked')?.value).id,
       };
       savePrefs(this.prefs);
     };
+    // ao trocar de robô, o tempo entre lançamentos volta ao padrão daquele mecanismo
+    form.querySelectorAll<HTMLInputElement>('input[name="robot"]').forEach((input) =>
+      input.addEventListener("change", () => {
+        form.querySelector<HTMLInputElement>("#interval")!.value = String(robotPreset(input.value).launchIntervalS);
+      }),
+    );
     form.addEventListener("submit", (e) => {
       e.preventDefault();
       read();
@@ -239,6 +257,7 @@ export class App {
       eventName: this.prefs.eventName,
       matchLabel: mode === "practice" ? "Treino livre" : "Partida de treino",
       launchIntervalS: clampInterval(this.prefs.launchIntervalS),
+      robotPreset: this.prefs.robotPreset,
     };
     history.replaceState(null, "", "#play");
     this.root.innerHTML = "";

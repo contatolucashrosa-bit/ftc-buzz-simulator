@@ -3,6 +3,7 @@
 import type { Quality } from "../render/stage";
 import type { AutoProgramId } from "../game/autonomous";
 import { DEFAULT_LAUNCH_INTERVAL_S } from "./robotDefaults";
+import type { RobotPresetId } from "./robotPresets";
 
 export const APP = {
   name: "Buzz Simulator",
@@ -26,6 +27,7 @@ export interface Preferences {
   eventName: string;
   /** Tempo entre lançamentos na rajada (s). Padrão do robô genérico; a Oficina vai calcular pelo mecanismo. */
   launchIntervalS: number;
+  robotPreset: RobotPresetId;
 }
 
 const PREFS_KEY = "buzz-simulator:prefs";
@@ -39,7 +41,7 @@ export function defaultQuality(): Quality {
 }
 
 export function loadPrefs(): Preferences {
-  const fallback: Preferences = { teamNumber: "24823", quality: defaultQuality(), autoProgram: "leavePark", eventName: "Treino da equipe", launchIntervalS: DEFAULT_LAUNCH_INTERVAL_S };
+  const fallback: Preferences = { teamNumber: "24823", quality: defaultQuality(), autoProgram: "leavePark", eventName: "Treino da equipe", launchIntervalS: DEFAULT_LAUNCH_INTERVAL_S, robotPreset: "generic" };
   try {
     const raw = localStorage.getItem(PREFS_KEY);
     return raw ? { ...fallback, ...(JSON.parse(raw) as Partial<Preferences>) } : fallback;

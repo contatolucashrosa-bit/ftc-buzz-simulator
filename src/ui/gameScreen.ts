@@ -4,6 +4,7 @@ import { Game, type GameOptions, type GameView } from "../game/game";
 import { recordMatchPlayed } from "../config/app";
 import { ICON_POLLINATOR, ICON_ROBOT, ICON_SWARM } from "./icons";
 import { escapeHtml } from "./dom";
+import { robotPreset } from "../config/robotPresets";
 import type { AllianceScore } from "../scoring/scoring";
 
 export type OverlayMode = "broadcast" | "driver" | "hidden";
@@ -96,6 +97,13 @@ function resultRows(view: GameView): string {
 
 export async function mountGameScreen(root: HTMLElement, options: GameOptions, actions: GameScreenActions): Promise<() => void> {
   const isTouch = window.matchMedia?.("(pointer: coarse)").matches ?? false;
+  const robot = robotPreset(options.robotPreset);
+  // o botão G/RB muda conforme o mecanismo da FLOWER do robô escolhido
+  const flowerKey = robot.canPlace
+    ? { help: "colocar (FLOWER)", button: "Colocar" }
+    : robot.flowerRetrieval === "servo"
+      ? { help: "servo: tirar POLLEN da FLOWER", button: "Servo" }
+      : { help: "", button: "" };
   root.innerHTML = `
     <div class="game" role="application" aria-label="Arena do Buzz Simulator">
       <div class="stage-host"></div>
@@ -134,6 +142,7 @@ export async function mountGameScreen(root: HTMLElement, options: GameOptions, a
           <div class="panel-body">
           <div class="hopper" data-hopper aria-label="Depósito"></div>
           <dl class="kv" style="margin-top:8px">
+            <dt>Modelo</dt><dd>${escapeHtml(robot.label)}</dd>
             <dt>Intake</dt><dd data-intake>parado</dd>
             <dt>Lançador</dt><dd data-launcher></dd>
             <dt>Rajada</dt><dd data-burst></dd>
@@ -149,16 +158,16 @@ export async function mountGameScreen(root: HTMLElement, options: GameOptions, a
       <div class="panel help" data-help ${isTouch ? "hidden" : ""}>
         <h4>Controles</h4>
         <table>
-          <tr><td>W A S D</td><td>mover</td></tr>
+          <tr><td>W A S D</td><td>${robot.drivetrain === "mecanum" ? "mover" : "W S andar · A D não fazem nada (tração tanque)"}</td></tr>
           <tr><td>Q / E</td><td>girar</td></tr>
           <tr><td>Espaço</td><td>intake (segurar)</td></tr>
           <tr><td>F</td><td>lançar tudo em rajada (HIVE)</td></tr>
-          <tr><td>G</td><td>colocar (FLOWER)</td></tr>
+          ${flowerKey.help ? `<tr><td>G</td><td>${flowerKey.help}</td></tr>` : ""}
           <tr><td>↑ ↓ / ← →</td><td>velocidade / ângulo</td></tr>
           <tr><td>N</td><td>HUMAN PLAYER: NECTAR</td></tr>
           <tr><td>C · O · R · V</td><td>câmera · direção · reiniciar · placar</td></tr>
           <tr><td>Mouse</td><td>câmera do robô: arrastar gira, roda aproxima</td></tr>
-          <tr><td>Gamepad</td><td>analógicos, LT coleta, RT lança, RB coloca, Y NECTAR; analógico direito ↕ inclina a câmera do robô, R3 + ↔ gira</td></tr>
+          <tr><td>Gamepad</td><td>analógicos, LT coleta, RT lança, ${flowerKey.button ? `RB ${flowerKey.button.toLowerCase()},` : ""} Y NECTAR; analógico direito ↕ inclina a câmera do robô, R3 + ↔ gira</td></tr>
         </table>
       </div>
       <div class="touch ${isTouch ? "show" : ""}" data-touch>
@@ -166,7 +175,7 @@ export async function mountGameScreen(root: HTMLElement, options: GameOptions, a
         <div class="touch-buttons">
           <button data-action="intake">Coletar</button>
           <button data-action="launch">Lançar</button>
-          <button data-action="place">Colocar</button>
+          ${flowerKey.button ? `<button data-action="place">${flowerKey.button}</button>` : ""}
           <button data-action="nectar">NECTAR</button>
         </div>
         <div class="stick" data-stick="turn" aria-label="Girar"><div class="knob"></div></div>
