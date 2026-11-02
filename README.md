@@ -37,7 +37,8 @@ Já disponível (marcos M0–M3):
   - **REV DUO**: tração tanque por correias e um servo que tira o POLLEN da FLOWER;
   - **AndyMark Robits**: tanque com rodas omni e stealth, lançador com capô e servo de retirada.
   - Os starter bots não andam de lado nem pontuam na FLOWER. Detalhes em [docs/starter-bots.md](docs/starter-bots.md).
-- **Cenário de evento** gerado no código: céu, gramado, floresta, cogumelos e flores low-poly, arquibancada com plateia, banners da WestSharks (com espaço para a logo autorizada) e HUMAN PLAYERS apicultores que animam ao entregar NECTAR.
+- **Oficina com importação de CAD**: GLB, STL e STEP (até 40 MB no navegador). Montagens maiores passam pelo conversor `npm run cad:convert`. O modelo é orientado, conferido contra o R102 e guardado neste aparelho; depois, aparece na tela "Jogar". Detalhes em [docs/cad-import.md](docs/cad-import.md).
+- **Cenário de evento** gerado no código: céu com nuvens, gramado, floresta, cogumelos e flores low-poly, painéis com as faixas da WestSharks (com espaço para a logo autorizada), três arquibancadas com plateia e, em cada ALLIANCE AREA, 2 HUMAN PLAYERS apicultores, 2 pilotos e 1 técnico.
 - **POLLEN e NECTAR perfurados**: 26 furos, com os diâmetros dos desenhos oficiais.
 - **Partida completa**: AUTO de 30 s, transição de 8 s e TELEOP de 2:00, com o relógio oficial.
 - **Pontuação automática** de todas as linhas da Tabela 10-2:
@@ -50,7 +51,7 @@ Já disponível (marcos M0–M3):
 - **Controles**: teclado, gamepad e toque; câmeras de plateia, piloto, robô, de cima e livre.
 - **Qualidade ajustável** para computadores escolares modestos.
 
-Próximos marcos: Java do Android Studio no navegador (com Pedro Pathing e RoadRunner), Oficina com importação de CAD em STEP, placares locais, robôs-bot e modo 100% offline (PWA). O roadmap completo está em [docs/phase-1-analysis.md](docs/phase-1-analysis.md).
+Próximos marcos: Java do Android Studio no navegador (com Pedro Pathing e RoadRunner), marcação de mecanismos no CAD, placares locais, robôs-bot e modo 100% offline (PWA). O roadmap completo está em [docs/phase-1-analysis.md](docs/phase-1-analysis.md).
 
 ## Sumário
 
@@ -72,6 +73,8 @@ ftc-buzz-simulator/
 ├── data/rules/biobuzz-tu07.json   # regras do manual em dados (pontos, tempos, medidas), com página citada
 ├── docs/phase-1-analysis.md       # análise da Fase 1, decisões e roadmap
 ├── docs/starter-bots.md           # mecanismos e limitações dos starter bots de referência
+├── docs/cad-import.md             # importação de CAD na Oficina e conversor STEP → GLB
+├── scripts/step-to-glb.mjs        # conversor de montagens STEP grandes (npm run cad:convert)
 ├── src/
 │   ├── rules/        # leitura tipada do arquivo de regras
 │   ├── scoring/      # motor de pontuação puro (Tabela 10-2) + testes
@@ -132,6 +135,7 @@ O conteúdo de `dist/` pode ser publicado em qualquer hospedagem estática gratu
 
 - **Início:** apresentação, botão "Jogar no navegador" e plataformas suportadas.
 - **Jogar:** número da equipe, nome do evento, robô, programa do AUTO, tempo entre lançamentos e qualidade gráfica.
+- **Oficina:** importar o CAD do robô (GLB, STL ou STEP), orientar, conferir o tamanho (R102), escolher os mecanismos e guardar.
 - **Arena:** Score Overlay no topo, HUD do robô (depósito, lançador, NECTAR liberado) e ajuda de controles.
 
 **Controles:**

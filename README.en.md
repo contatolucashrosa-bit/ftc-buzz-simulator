@@ -37,7 +37,8 @@ Available now (milestones M0–M3):
   - **REV DUO**: belt tank drive and a servo that takes POLLEN out of the FLOWER;
   - **AndyMark Robits**: tank drive with omni and stealth wheels, hooded launcher and a release servo.
   - The starter bots cannot strafe or score in the FLOWER. Details in [docs/starter-bots.md](docs/starter-bots.md) (in Portuguese).
-- **Event scenery** generated in code: sky, grass, low-poly forest, mushrooms and flowers, bleachers with an audience, WestSharks banners (with a slot for the authorized logo) and beekeeper HUMAN PLAYERS that animate when delivering NECTAR.
+- **Workshop with CAD import**: GLB, STL and STEP (up to 40 MB in the browser). Larger assemblies go through the `npm run cad:convert` converter. The model is oriented, checked against R102 and stored on this device; it then shows up on the "Play" screen. Details in [docs/cad-import.md](docs/cad-import.md) (in Portuguese).
+- **Event scenery** generated in code: sky with clouds, grass, low-poly forest, mushrooms and flowers, backdrops with WestSharks banners (with a slot for the authorized logo), three bleachers with an audience and, in each ALLIANCE AREA, 2 beekeeper HUMAN PLAYERS, 2 drivers and 1 coach.
 - **Perforated POLLEN and NECTAR**: 26 holes, with the diameters from the official drawings.
 - **Full match**: 30 s AUTO, 8 s transition and 2:00 TELEOP, with the official clock.
 - **Automatic scoring** of every row of Table 10-2:
@@ -50,7 +51,7 @@ Available now (milestones M0–M3):
 - **Controls**: keyboard, gamepad and touch; audience, driver, robot, top-down and free cameras.
 - **Adjustable quality** for modest school computers.
 
-Next milestones: Android Studio Java in the browser (with Pedro Pathing and RoadRunner), a Workshop with STEP CAD import, local leaderboards, bot robots and a 100% offline mode (PWA). The full roadmap is in [docs/phase-1-analysis.md](docs/phase-1-analysis.md) (in Portuguese).
+Next milestones: Android Studio Java in the browser (with Pedro Pathing and RoadRunner), mechanism tagging on the CAD, local leaderboards, bot robots and a 100% offline mode (PWA). The full roadmap is in [docs/phase-1-analysis.md](docs/phase-1-analysis.md) (in Portuguese).
 
 ## Table of Contents
 
@@ -72,6 +73,8 @@ ftc-buzz-simulator/
 ├── data/rules/biobuzz-tu07.json   # manual rules as data (points, timing, dimensions), with page citations
 ├── docs/phase-1-analysis.md       # Phase 1 analysis, decisions and roadmap
 ├── docs/starter-bots.md           # mechanisms and limitations of the reference starter bots
+├── docs/cad-import.md             # Workshop CAD import and the STEP → GLB converter
+├── scripts/step-to-glb.mjs        # converter for large STEP assemblies (npm run cad:convert)
 ├── src/
 │   ├── rules/        # typed access to the rules file
 │   ├── scoring/      # pure scoring engine (Table 10-2) + tests
@@ -132,6 +135,7 @@ The contents of `dist/` can be published on any free static host, such as GitHub
 
 - **Home:** introduction, "Play in the browser" button and supported platforms.
 - **Play:** team number, event name, robot, AUTO routine, time between launches and graphics quality.
+- **Workshop:** import the robot CAD (GLB, STL or STEP), orient it, check its size (R102), choose the mechanisms and save it.
 - **Arena:** Score Overlay at the top, robot HUD (hopper, launcher, released NECTAR) and controls help.
 
 **Controls:**
