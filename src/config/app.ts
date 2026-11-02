@@ -28,6 +28,8 @@ export interface Preferences {
   /** Tempo entre lançamentos na rajada (s). Padrão do robô genérico; a Oficina vai calcular pelo mecanismo. */
   launchIntervalS: number;
   robotPreset: RobotPresetId;
+  /** Robô importado na Oficina (id no IndexedDB); vazio = modelo próprio do simulador. */
+  robotModelId: string;
 }
 
 const PREFS_KEY = "buzz-simulator:prefs";
@@ -41,7 +43,7 @@ export function defaultQuality(): Quality {
 }
 
 export function loadPrefs(): Preferences {
-  const fallback: Preferences = { teamNumber: "24823", quality: defaultQuality(), autoProgram: "leavePark", eventName: "Treino da equipe", launchIntervalS: DEFAULT_LAUNCH_INTERVAL_S, robotPreset: "generic" };
+  const fallback: Preferences = { teamNumber: "24823", quality: defaultQuality(), autoProgram: "leavePark", eventName: "Treino da equipe", launchIntervalS: DEFAULT_LAUNCH_INTERVAL_S, robotPreset: "generic", robotModelId: "" };
   try {
     const raw = localStorage.getItem(PREFS_KEY);
     return raw ? { ...fallback, ...(JSON.parse(raw) as Partial<Preferences>) } : fallback;

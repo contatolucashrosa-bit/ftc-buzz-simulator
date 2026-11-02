@@ -103,6 +103,8 @@ export class Robot {
     readonly config: RobotConfig,
     physics: PhysicsWorld,
     scene: THREE.Scene,
+    /** Modelo do CAD importado (metros, frente em +X, piso em y = 0); substitui o modelo próprio. */
+    model?: THREE.Object3D,
   ) {
     const preset = config.preset;
     this.halfLength = preset.length / 2;
@@ -136,7 +138,8 @@ export class Robot {
       this.body,
     );
 
-    this.buildMesh();
+    if (model) this.useCadModel(model);
+    else this.buildMesh();
     scene.add(this.group);
 
     this.trajectory = new THREE.Line(
@@ -145,6 +148,20 @@ export class Robot {
     );
     scene.add(this.trajectory);
     this.sync();
+  }
+
+  /** Usa o CAD da equipe como visual; a física continua com a caixa e os mecanismos da variante. */
+  private useCadModel(model: THREE.Object3D): void {
+    model.position.y = (-CHASSIS_HEIGHT / 2 - 0.05) * INCH;
+    this.group.add(model);
+    // ROBOT SIGN (R401–R403) por fora do modelo, nas laterais
+    const sign = new THREE.MeshStandardMaterial({ map: signTexture(this.config.teamNumber, ALLIANCE_COLORS[this.config.alliance]) });
+    for (const side of [-1, 1]) {
+      const plate = new THREE.Mesh(new THREE.PlaneGeometry(Math.min(12, this.halfLength * 2 - 4) * INCH, 3.5 * INCH), sign);
+      plate.position.set(0, 0.2 * INCH, side * (this.halfWidth + 0.15) * INCH);
+      plate.rotation.y = side > 0 ? 0 : Math.PI;
+      this.group.add(plate);
+    }
   }
 
   private buildMesh(): void {
@@ -457,7 +474,7 @@ export class Robot {
    * em direção ao intake. Devolve true se tirou um POLLEN.
    */
   pokeFlower(elements: ElementManager, enabled: boolean): boolean {
-    if (!enabled || this.disabled || this.servoCooldown > 0 || !this.servoArm) return false;
+    if (!enabled || this.disabled || this.servoCooldown > 0 || this.config.preset.flowerRetrieval !== "servo") return false;
     this.servoCooldown = SERVO_COOLDOWN_S;
     this.servoTime = SERVO_SWING_S;
     const { x, y, heading } = this.pose();

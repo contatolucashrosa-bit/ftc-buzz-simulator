@@ -8,6 +8,7 @@ import { escapeHtml } from "./dom";
 import { ICON_BRAND } from "./icons";
 import { LAUNCH_INTERVAL_LIMITS, clampLaunchInterval as clampInterval } from "../config/robotDefaults";
 import { ROBOT_PRESETS, ROBOT_PRESET_IDS, robotPreset } from "../config/robotPresets";
+import { CAD_PREFIX, listRobots } from "../workshop/robotStore";
 
 type Route = "home" | "setup" | "workshop" | "leaderboard" | "teamRobots" | "about";
 
@@ -25,6 +26,13 @@ const QUALITY_LABELS: Record<Quality, string> = {
   medium: "Média — notebook comum",
   high: "Alta — sombras e mais detalhes",
 };
+
+/** Robô escolhido na tela "Jogar": um modelo do simulador ou um CAD importado (com os mecanismos guardados). */
+function readRobotChoice(input: HTMLInputElement | null): Pick<Preferences, "robotPreset" | "robotModelId"> {
+  const value = input?.value ?? "generic";
+  if (value.startsWith(CAD_PREFIX)) return { robotPreset: robotPreset(input?.dataset.preset).id, robotModelId: value.slice(CAD_PREFIX.length) };
+  return { robotPreset: robotPreset(value).id, robotModelId: "" };
+}
 
 export class App {
   private cleanup: (() => void) | null = null;
@@ -52,12 +60,7 @@ export class App {
     const pages: Record<Route, () => string> = {
       home: () => this.homeHtml(),
       setup: () => this.setupHtml(),
-      workshop: () =>
-        this.comingSoonHtml(
-          "Oficina",
-          "Aqui cada equipe vai importar o CAD do próprio robô em STEP (exportado do Onshape, SolidWorks, Fusion 360 ou Inventor), marcar rodas, braços e lançador, passar pela inspeção automática (R102, R105, R503) e importar o projeto Java do Android Studio.",
-          "M6 (montagem e inspeção), M5 (Java no navegador) e M11 (STEP avançado)",
-        ),
+      workshop: () => `<div data-workshop><p class="lead">Carregando a Oficina…</p></div>`,
       leaderboard: () =>
         this.comingSoonHtml(
           "Placares",
@@ -75,6 +78,7 @@ export class App {
     this.root.innerHTML = `${this.navHtml(route)}<main class="page" id="main">${pages[route]()}</main>${this.footerHtml()}`;
     this.bindNav();
     if (route === "setup") this.bindSetup();
+    if (route === "workshop") this.mountWorkshop();
     this.root.querySelectorAll<HTMLElement>("[data-go]").forEach((el) =>
       el.addEventListener("click", () => this.go(el.dataset.go as Route)),
     );
@@ -128,7 +132,7 @@ export class App {
       <section class="cards" aria-label="Modos">
         <div class="card"><h3>Treino livre <span class="badge badge-ok">pronto</span></h3><p>Sem relógio: dirija, colete POLLEN, vire a HIVE e encha as FLOWERS no seu ritmo.</p><button class="btn btn-secondary btn-small" data-play="practice">Treinar</button></div>
         <div class="card"><h3>Partida completa <span class="badge badge-ok">pronto</span></h3><p>AUTO de 30 s, transição de 8 s e TELEOP de 2:00, com placar, RANKING POINTS e faltas automáticas.</p><button class="btn btn-secondary btn-small" data-go="setup">Configurar</button></div>
-        <div class="card"><h3>Oficina <span class="badge">em construção</span></h3><p>Importe o CAD do seu robô em STEP e o código Java do Android Studio.</p><button class="btn btn-secondary btn-small" data-go="workshop">Ver plano</button></div>
+        <div class="card"><h3>Oficina <span class="badge badge-ok">CAD pronto</span></h3><p>Importe o CAD do seu robô (GLB, STL ou STEP) e jogue com ele. Código Java do Android Studio em seguida.</p><button class="btn btn-secondary btn-small" data-go="workshop">Abrir Oficina</button></div>
         <div class="card"><h3>Placares <span class="badge">em construção</span></h3><p>Recordes locais por modo, replays e ranking da turma por arquivo.</p><button class="btn btn-secondary btn-small" data-go="leaderboard">Ver plano</button></div>
       </section>
       <p class="notice">${DISCLAIMER}</p>`;
@@ -144,7 +148,7 @@ export class App {
       .join("");
     const robotChoices = ROBOT_PRESET_IDS.map((id) => {
       const r = ROBOT_PRESETS[id];
-      return `<label class="choice"><input type="radio" name="robot" value="${id}" ${p.robotPreset === id ? "checked" : ""}>
+      return `<label class="choice"><input type="radio" name="robot" value="${id}" ${!p.robotModelId && p.robotPreset === id ? "checked" : ""}>
         <span>${r.label}<small>${r.description}</small></span></label>`;
     }).join("");
     const qualityOptions = (Object.keys(QUALITY_LABELS) as Quality[])
@@ -165,6 +169,7 @@ export class App {
         <fieldset class="field choices">
           <legend>Robô</legend>
           ${robotChoices}
+          <div data-imported-robots></div>
           <small>Variantes inspiradas nos starter bots públicos do BIOBUZZ. Os starter bots não pontuam na FLOWER: só tiram POLLEN dela.</small>
         </fieldset>
         <fieldset class="field choices">
@@ -199,16 +204,29 @@ export class App {
         autoProgram: (form.querySelector<HTMLInputElement>('input[name="auto"]:checked')?.value as AutoProgramId) ?? "leavePark",
         quality: form.querySelector<HTMLSelectElement>("#quality")!.value as Quality,
         launchIntervalS: clampInterval(Number(form.querySelector<HTMLInputElement>("#interval")!.value.replace(",", "."))),
-        robotPreset: robotPreset(form.querySelector<HTMLInputElement>('input[name="robot"]:checked')?.value).id,
+        ...readRobotChoice(form.querySelector<HTMLInputElement>('input[name="robot"]:checked')),
       };
       savePrefs(this.prefs);
     };
     // ao trocar de robô, o tempo entre lançamentos volta ao padrão daquele mecanismo
-    form.querySelectorAll<HTMLInputElement>('input[name="robot"]').forEach((input) =>
-      input.addEventListener("change", () => {
-        form.querySelector<HTMLInputElement>("#interval")!.value = String(robotPreset(input.value).launchIntervalS);
-      }),
-    );
+    const bindRobotChange = () =>
+      form.querySelectorAll<HTMLInputElement>('input[name="robot"]').forEach((input) =>
+        input.addEventListener("change", () => {
+          form.querySelector<HTMLInputElement>("#interval")!.value = String(robotPreset(readRobotChoice(input).robotPreset).launchIntervalS);
+        }),
+      );
+    // robôs importados na Oficina (IndexedDB) entram depois, sem atrasar a tela
+    void listRobots().then((robots) => {
+      const slot = form.querySelector("[data-imported-robots]");
+      if (!slot || !robots.length) return bindRobotChange();
+      slot.innerHTML = robots
+        .map(
+          (r) => `<label class="choice"><input type="radio" name="robot" value="${CAD_PREFIX}${r.id}" data-preset="${r.preset}" ${this.prefs.robotModelId === r.id ? "checked" : ""}>
+          <span>${escapeHtml(r.name)} <span class="badge badge-ok">CAD importado</span><small>${r.sizeIn.length.toFixed(1)} × ${r.sizeIn.width.toFixed(1)} pol · mecanismos: ${escapeHtml(ROBOT_PRESETS[r.preset]?.label ?? r.preset)}</small></span></label>`,
+        )
+        .join("");
+      bindRobotChange();
+    });
     form.addEventListener("submit", (e) => {
       e.preventDefault();
       read();
@@ -218,6 +236,15 @@ export class App {
       read();
       this.play("practice");
     });
+  }
+
+  private async mountWorkshop(): Promise<void> {
+    const host = this.root.querySelector<HTMLElement>("[data-workshop]");
+    if (!host) return;
+    // Three.js só é carregado ao abrir a Oficina
+    const { mountWorkshop } = await import("./workshop");
+    if (!host.isConnected) return;
+    this.cleanup = await mountWorkshop(host);
   }
 
   private comingSoonHtml(title: string, text: string, milestone: string): string {
@@ -258,6 +285,7 @@ export class App {
       matchLabel: mode === "practice" ? "Treino livre" : "Partida de treino",
       launchIntervalS: clampInterval(this.prefs.launchIntervalS),
       robotPreset: this.prefs.robotPreset,
+      robotModelId: this.prefs.robotModelId || undefined,
     };
     history.replaceState(null, "", "#play");
     this.root.innerHTML = "";

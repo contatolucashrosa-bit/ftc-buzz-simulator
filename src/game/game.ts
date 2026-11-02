@@ -13,11 +13,26 @@ import { Hive } from "../sim/hive";
 import { Flower } from "../sim/flower";
 import { Robot, robotConfigFromPreset } from "../sim/robot";
 import { Environment } from "../render/environment";
+import { getRobot } from "../workshop/robotStore";
+import { loadStoredModel } from "../workshop/cadImport";
+import type { RobotPreset } from "../config/robotPresets";
 import { robotPreset, type RobotPresetId } from "../config/robotPresets";
 import { ELEMENTS, FIELD, FLOWERS, GARDENS, HIVE, LOADING_ZONES, circleTouchesRect, toWorld, INCH } from "../sim/geometry";
 import { AutoRunner, buildAutoSteps, RED_START, type AutoProgramId } from "./autonomous";
 
 export type GameMode = "practice" | "match";
+
+interface CadRobot {
+  model: THREE.Object3D;
+  sizeIn: { length: number; width: number; height: number };
+}
+
+/** A física usa a caixa do CAD (limitada ao tamanho de largada, R102) com os mecanismos da variante escolhida. */
+function withCadSize(preset: RobotPreset, cad?: CadRobot): RobotPreset {
+  if (!cad) return preset;
+  const clamp = (v: number) => Math.min(18, Math.max(8, v));
+  return { ...preset, length: clamp(cad.sizeIn.length), width: clamp(cad.sizeIn.width), height: Math.min(18, Math.max(8, cad.sizeIn.height)) };
+}
 
 export interface GameOptions {
   mode: GameMode;
@@ -29,6 +44,8 @@ export interface GameOptions {
   /** Tempo entre lançamentos na rajada (s); depende do mecanismo do robô. */
   launchIntervalS: number;
   robotPreset: RobotPresetId;
+  /** Robô importado na Oficina; o modelo 3D e as medidas vêm do CAD. */
+  robotModelId?: string;
 }
 
 export interface FoulEntry {
@@ -130,13 +147,20 @@ export class Game {
 
   static async create(container: HTMLElement, options: GameOptions, callbacks: GameCallbacks): Promise<Game> {
     await initPhysics();
-    return new Game(container, options, callbacks);
+    let cad: CadRobot | undefined;
+    if (options.robotModelId) {
+      // CAD importado na Oficina; se sumiu do aparelho, joga com o modelo próprio da variante
+      const stored = await getRobot(options.robotModelId).catch(() => undefined);
+      if (stored) cad = { model: await loadStoredModel(stored.glb), sizeIn: stored.sizeIn };
+    }
+    return new Game(container, options, callbacks, cad);
   }
 
   private constructor(
     container: HTMLElement,
     readonly options: GameOptions,
     private readonly callbacks: GameCallbacks,
+    cad?: CadRobot,
   ) {
     const quality = QUALITY_SETTINGS[options.quality];
     this.stage = new Stage(container, options.quality, "red");
@@ -150,9 +174,10 @@ export class Game {
     };
     this.flowers = FLOWERS.map((spec) => new Flower(spec, this.physics, this.stage.scene));
     this.robot = new Robot(
-      { ...robotConfigFromPreset(robotPreset(options.robotPreset)), alliance: "red", teamNumber: options.teamNumber, start: RED_START, launchIntervalS: options.launchIntervalS },
+      { ...robotConfigFromPreset(withCadSize(robotPreset(options.robotPreset), cad)), alliance: "red", teamNumber: options.teamNumber, start: RED_START, launchIntervalS: options.launchIntervalS },
       this.physics,
       this.stage.scene,
+      cad?.model,
     );
     this.auto = new AutoRunner(options.mode === "match" ? buildAutoSteps(options.autoProgram) : []);
     this.stageElements();
@@ -404,9 +429,9 @@ export class Game {
     this.elements.sync();
     this.robot.sync(this.clock().driverControl || this.options.mode === "practice");
     for (const hive of Object.values(this.hives)) hive.syncVisual();
-    // na câmera do piloto, o HUMAN PLAYER da própria aliança fica colado à câmera e tapava metade do campo
-    this.environment.humanPlayers.red.root.visible = this.stage.mode !== "driver";
-    this.environment.update(realDt);
+    // na câmera do piloto, as pessoas da própria ALLIANCE AREA ficam coladas à câmera e tapavam metade do campo
+    this.environment.alliances.red.visible = this.stage.mode !== "driver";
+    this.environment.update(realDt, this.stage.camera.position);
     const t = this.robot.body.translation();
     this.stage.update({ position: new THREE.Vector3(t.x, t.y, t.z), heading: this.robot.pose().heading });
     this.stage.render();
