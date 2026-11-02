@@ -32,6 +32,13 @@ Já disponível (marcos M0–M3):
   - intake de até 4 elementos (G407), que nunca pega NECTAR adversário (G408);
   - lançador com prévia da trajetória;
   - "colocar" para as FLOWERS.
+- **Variantes de robô** inspiradas nos starter bots públicos do BIOBUZZ (modelos 3D próprios, sem redistribuir os CADs):
+  - **goBILDA**: 6WD drop-center, intake de rodas Gecko que puxa o POLLEN de dentro da FLOWER;
+  - **REV DUO**: tração tanque por correias e um servo que tira o POLLEN da FLOWER;
+  - **AndyMark Robits**: tanque com rodas omni e stealth, lançador com capô e servo de retirada.
+  - Os starter bots não andam de lado nem pontuam na FLOWER. Detalhes em [docs/starter-bots.md](docs/starter-bots.md).
+- **Cenário de evento** gerado no código: céu, gramado, floresta, cogumelos e flores low-poly, arquibancada com plateia, banners da WestSharks (com espaço para a logo autorizada) e HUMAN PLAYERS apicultores que animam ao entregar NECTAR.
+- **POLLEN e NECTAR perfurados**: 26 furos, com os diâmetros dos desenhos oficiais.
 - **Partida completa**: AUTO de 30 s, transição de 8 s e TELEOP de 2:00, com o relógio oficial.
 - **Pontuação automática** de todas as linhas da Tabela 10-2:
   - LEAVE, PARK, HIVE TIP (AUTO/TELEOP), CELL, FLOWER (dona + bônus do NECTAR mais baixo) e GARDEN;
@@ -64,13 +71,15 @@ Próximos marcos: Java do Android Studio no navegador (com Pedro Pathing e RoadR
 ftc-buzz-simulator/
 ├── data/rules/biobuzz-tu07.json   # regras do manual em dados (pontos, tempos, medidas), com página citada
 ├── docs/phase-1-analysis.md       # análise da Fase 1, decisões e roadmap
+├── docs/starter-bots.md           # mecanismos e limitações dos starter bots de referência
 ├── src/
 │   ├── rules/        # leitura tipada do arquivo de regras
 │   ├── scoring/      # motor de pontuação puro (Tabela 10-2) + testes
 │   ├── match/        # relógio da partida e regras do HUMAN PLAYER + testes
 │   ├── sim/          # física e modelos: campo, HIVE, FLOWER, elementos, robô
 │   ├── game/         # controlador da partida e autônomos de exemplo
-│   ├── render/       # palco Three.js, câmeras e presets de qualidade
+│   ├── render/       # palco Three.js, câmeras, cenário e presets de qualidade
+│   ├── config/       # preferências, padrões e variantes de robô (módulos leves)
 │   ├── input/        # teclado, gamepad e toque
 │   ├── ui/           # telas, Score Overlay e HUD
 │   └── styles/       # tokens de cor da FIRST e estilos
@@ -122,7 +131,7 @@ O conteúdo de `dist/` pode ser publicado em qualquer hospedagem estática gratu
 ## Interface Web
 
 - **Início:** apresentação, botão "Jogar no navegador" e plataformas suportadas.
-- **Jogar:** número da equipe, nome do evento, programa do AUTO e qualidade gráfica.
+- **Jogar:** número da equipe, nome do evento, robô, programa do AUTO, tempo entre lançamentos e qualidade gráfica.
 - **Arena:** Score Overlay no topo, HUD do robô (depósito, lançador, NECTAR liberado) e ajuda de controles.
 
 **Controles:**
@@ -133,7 +142,7 @@ O conteúdo de `dist/` pode ser publicado em qualquer hospedagem estática gratu
 | Girar | Q / E | analógico direito |
 | Intake (segurar) | Espaço | LT ou LB |
 | Lançar todo o depósito em rajada | F | RT |
-| Colocar na FLOWER | G | RB |
+| Mecanismo da FLOWER: colocar (robô de treino) ou servo de retirada (REV DUO, AndyMark) | G | RB |
 | Velocidade / ângulo do lançador | ↑ ↓ / ← → | direcional |
 | HUMAN PLAYER: introduzir NECTAR | N | Y |
 | Câmera · direção · reiniciar · pausar | C · O · R · Esc | Back · — · — · Start |

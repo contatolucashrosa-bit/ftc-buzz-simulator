@@ -32,6 +32,13 @@ Available now (milestones M0–M3):
   - an intake for up to 4 elements (G407) that never takes opponent NECTAR (G408);
   - a launcher with trajectory preview;
   - a "place" action for the FLOWERS.
+- **Robot variants** inspired by the public BIOBUZZ starter bots (our own 3D models; the CADs are not redistributed):
+  - **goBILDA**: drop-center 6WD, Gecko wheel intake that pulls POLLEN out of the FLOWER;
+  - **REV DUO**: belt tank drive and a servo that takes POLLEN out of the FLOWER;
+  - **AndyMark Robits**: tank drive with omni and stealth wheels, hooded launcher and a release servo.
+  - The starter bots cannot strafe or score in the FLOWER. Details in [docs/starter-bots.md](docs/starter-bots.md) (in Portuguese).
+- **Event scenery** generated in code: sky, grass, low-poly forest, mushrooms and flowers, bleachers with an audience, WestSharks banners (with a slot for the authorized logo) and beekeeper HUMAN PLAYERS that animate when delivering NECTAR.
+- **Perforated POLLEN and NECTAR**: 26 holes, with the diameters from the official drawings.
 - **Full match**: 30 s AUTO, 8 s transition and 2:00 TELEOP, with the official clock.
 - **Automatic scoring** of every row of Table 10-2:
   - LEAVE, PARK, HIVE TIP (AUTO/TELEOP), CELL, FLOWER (owner + bottom NECTAR bonus) and GARDEN;
@@ -64,13 +71,15 @@ Next milestones: Android Studio Java in the browser (with Pedro Pathing and Road
 ftc-buzz-simulator/
 ├── data/rules/biobuzz-tu07.json   # manual rules as data (points, timing, dimensions), with page citations
 ├── docs/phase-1-analysis.md       # Phase 1 analysis, decisions and roadmap
+├── docs/starter-bots.md           # mechanisms and limitations of the reference starter bots
 ├── src/
 │   ├── rules/        # typed access to the rules file
 │   ├── scoring/      # pure scoring engine (Table 10-2) + tests
 │   ├── match/        # match clock and HUMAN PLAYER rules + tests
 │   ├── sim/          # physics and models: field, HIVE, FLOWER, elements, robot
 │   ├── game/         # match controller and sample autonomous routines
-│   ├── render/       # Three.js stage, cameras and quality presets
+│   ├── render/       # Three.js stage, cameras, scenery and quality presets
+│   ├── config/       # preferences, defaults and robot variants (lightweight modules)
 │   ├── input/        # keyboard, gamepad and touch
 │   ├── ui/           # screens, Score Overlay and HUD
 │   └── styles/       # FIRST color tokens and styles
@@ -122,7 +131,7 @@ The contents of `dist/` can be published on any free static host, such as GitHub
 ## Web Interface
 
 - **Home:** introduction, "Play in the browser" button and supported platforms.
-- **Play:** team number, event name, AUTO routine and graphics quality.
+- **Play:** team number, event name, robot, AUTO routine, time between launches and graphics quality.
 - **Arena:** Score Overlay at the top, robot HUD (hopper, launcher, released NECTAR) and controls help.
 
 **Controls:**
@@ -133,7 +142,7 @@ The contents of `dist/` can be published on any free static host, such as GitHub
 | Turn | Q / E | right stick |
 | Intake (hold) | Space | LT or LB |
 | Launch the whole hopper in a burst | F | RT |
-| Place in FLOWER | G | RB |
+| FLOWER mechanism: place (training robot) or retrieval servo (REV DUO, AndyMark) | G | RB |
 | Launcher speed / angle | ↑ ↓ / ← → | D-pad |
 | HUMAN PLAYER: enter NECTAR | N | Y |
 | Camera · drive mode · restart · pause | C · O · R · Esc | Back · — · — · Start |
