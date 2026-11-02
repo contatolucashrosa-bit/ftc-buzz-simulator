@@ -51,9 +51,10 @@ export function allianceSide(x: number): Alliance {
 export const ELEMENTS = {
   pollenRadius: 2.8 / 2, // §9.8 p.72
   nectarRadius: 3.6 / 2,
-  // suposição: massas não constam no manual (bolas ocas: massa ~ área da superfície)
-  pollenMassKg: 0.015,
-  nectarMassKg: 0.025,
+  // Massas calculadas do CAD oficial da AndyMark (STEP am-5851 / am-5852): volume 22,29 cm³ e 43,11 cm³,
+  // polietileno a ~0,95 g/cm³ (o manual não informa massa). Ver docs/scoring-element-mass.md.
+  pollenMassKg: 0.021,
+  nectarMassKg: 0.041,
 };
 
 /** §9.6 p.67–69 (Figuras 9-8 a 9-11). */
@@ -72,8 +73,10 @@ export const HIVE = {
   frameWidth: 49.46, // §9.6.1
   frameDepth: 38.95,
   // suposição: massa na CELL de cima que vira a HIVE (o manual não informa, §8 p.60).
-  // Com 3 NECTAR iniciais (75 g), 1 POLLEN já vira; uma CELL vazia precisa de ~6 POLLEN ou 4 NECTAR.
-  tipThresholdKg: 0.09,
+  // Os 3 NECTAR da largada (123 g) não viram a HIVE; com 135 g, +1 POLLEN já vira.
+  // Uma CELL vazia precisa de 7 POLLEN, 4 NECTAR ou combinações (tabela em docs/scoring-element-mass.md).
+  // Será calibrado com o CAD da arena (massa e centro de gravidade da HIVE) ou com testes no campo real.
+  tipThresholdKg: 0.135,
   tipDurationS: 0.6, // suposição
 };
 
@@ -106,8 +109,9 @@ export const FLOWER = {
   lowerRingHeight: 0.4,
   lowerRingHoleRadius: 2.79 / 2,
   retrievalHeight: 3.55,
-  // suposição: o furo do anel do meio deixa passar POLLEN (2.8) e segura NECTAR (3.6)
-  middleRingHoleRadius: 3.2 / 2,
+  // suposição: o furo do anel do meio deixa passar POLLEN (2.8) e segura NECTAR (3.6);
+  // 3.3 pol dá folga para o POLLEN cair até o anel de baixo quando o de baixo é retirado
+  middleRingHoleRadius: 3.3 / 2,
   middleRingThickness: 0.5,
   pipeRadius: 0.42,
   /** Volume de pontuação: entre o anel do meio e o anel do topo (§10.5.2, CAD Reference 10-4). */
