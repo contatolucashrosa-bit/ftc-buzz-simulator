@@ -2,6 +2,11 @@
 // Palco 3D: renderizador, luzes, câmeras e presets de qualidade para computadores escolares modestos.
 import * as THREE from "three";
 import { OrbitControls } from "three/examples/jsm/controls/OrbitControls.js";
+import { RoomEnvironment } from "three/examples/jsm/environments/RoomEnvironment.js";
+import { EffectComposer } from "three/examples/jsm/postprocessing/EffectComposer.js";
+import { GTAOPass } from "three/examples/jsm/postprocessing/GTAOPass.js";
+import { OutputPass } from "three/examples/jsm/postprocessing/OutputPass.js";
+import { RenderPass } from "three/examples/jsm/postprocessing/RenderPass.js";
 import { toWorld } from "../sim/geometry";
 
 export type Quality = "low" | "medium" | "high";
@@ -29,16 +34,21 @@ const DEFAULT_ORBIT: FollowOrbit = { yaw: 0, pitch: 0.5, distance: 1.45 };
 const PITCH_LIMITS = [0.08, 1.45] as const;
 const DISTANCE_LIMITS = [0.6, 4.5] as const;
 
-export const QUALITY_SETTINGS: Record<Quality, { pixelRatio: number; antialias: boolean; shadows: boolean; sphereSegments: number; physicsHz: number }> = {
-  low: { pixelRatio: 0.75, antialias: false, shadows: false, sphereSegments: 10, physicsHz: 60 },
-  medium: { pixelRatio: 1, antialias: true, shadows: false, sphereSegments: 14, physicsHz: 120 },
-  high: { pixelRatio: 1.5, antialias: true, shadows: true, sphereSegments: 20, physicsHz: 120 },
+/**
+ * Presets de qualidade. `shadowSize`: resolução do mapa de sombras (0 = sem sombras);
+ * `reflections`: mapa de ambiente para metais e plásticos; `ambientOcclusion`: GTAO no pós-processamento.
+ */
+export const QUALITY_SETTINGS: Record<Quality, { pixelRatio: number; antialias: boolean; shadows: boolean; shadowSize: number; reflections: boolean; ambientOcclusion: boolean; sphereSegments: number; physicsHz: number }> = {
+  low: { pixelRatio: 0.75, antialias: false, shadows: false, shadowSize: 0, reflections: false, ambientOcclusion: false, sphereSegments: 10, physicsHz: 60 },
+  medium: { pixelRatio: 1, antialias: true, shadows: true, shadowSize: 1024, reflections: true, ambientOcclusion: false, sphereSegments: 14, physicsHz: 120 },
+  high: { pixelRatio: 1.5, antialias: true, shadows: true, shadowSize: 2048, reflections: true, ambientOcclusion: true, sphereSegments: 20, physicsHz: 120 },
 };
 
 export class Stage {
   readonly scene = new THREE.Scene();
   readonly camera = new THREE.PerspectiveCamera(50, 1, 0.05, 60);
   readonly renderer: THREE.WebGLRenderer;
+  private composer: EffectComposer | null = null;
   mode: CameraMode = "audience";
   readonly followOrbit: FollowOrbit = { ...DEFAULT_ORBIT };
   private readonly orbit: OrbitControls;
@@ -54,18 +64,49 @@ export class Stage {
     this.renderer = new THREE.WebGLRenderer({ antialias: q.antialias, powerPreference: "high-performance" });
     this.renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, q.pixelRatio));
     this.renderer.shadowMap.enabled = q.shadows;
+    this.renderer.shadowMap.type = THREE.PCFSoftShadowMap;
     this.renderer.outputColorSpace = THREE.SRGBColorSpace;
+    // ACES dá o contraste "de filme" das transmissões: brancos que não estouram e cores mais densas
+    this.renderer.toneMapping = THREE.ACESFilmicToneMapping;
+    this.renderer.toneMappingExposure = 0.95;
     this.renderer.domElement.className = "stage-canvas";
     container.appendChild(this.renderer.domElement);
 
     this.scene.background = new THREE.Color(0x14161b);
-    this.scene.add(new THREE.HemisphereLight(0xffffff, 0x30343c, 1.6));
-    const sun = new THREE.DirectionalLight(0xffffff, 1.4);
-    sun.position.set(-2, 6, 3);
-    sun.castShadow = q.shadows;
-    sun.shadow.mapSize.set(1024, 1024);
-    Object.assign(sun.shadow.camera, { left: -3, right: 3, top: 3, bottom: -3 });
-    this.scene.add(sun);
+    // Iluminação de ginásio: luz principal quente e alta (com sombra), contraluz fria e céu suave
+    this.scene.add(new THREE.HemisphereLight(0xe4ecff, 0x4a4238, q.reflections ? 0.7 : 2.2));
+    const key = new THREE.DirectionalLight(0xfff0dc, q.reflections ? 2.6 : 2.2);
+    key.position.set(-2.2, 7, 3.2);
+    key.castShadow = q.shadows;
+    if (q.shadows) {
+      key.shadow.mapSize.set(q.shadowSize, q.shadowSize);
+      Object.assign(key.shadow.camera, { left: -2.6, right: 2.6, top: 2.6, bottom: -2.6, near: 2, far: 14 });
+      key.shadow.bias = -0.0004;
+      key.shadow.normalBias = 0.015;
+      key.shadow.radius = 3;
+    }
+    this.scene.add(key);
+    const rim = new THREE.DirectionalLight(0xbcd4ff, 0.7);
+    rim.position.set(3, 4, -4);
+    this.scene.add(rim);
+    if (q.reflections) {
+      // reflexos difusos de um "salão" genérico: metais e plásticos deixam de parecer foscos
+      const pmrem = new THREE.PMREMGenerator(this.renderer);
+      this.scene.environment = pmrem.fromScene(new RoomEnvironment(), 0.04).texture;
+      this.scene.environmentIntensity = 0.55;
+      pmrem.dispose();
+    }
+    if (q.ambientOcclusion) {
+      // MSAA no alvo do compositor: o antialias do canvas não vale quando há pós-processamento
+      const target = new THREE.WebGLRenderTarget(1, 1, { type: THREE.HalfFloatType, samples: 4 });
+      this.composer = new EffectComposer(this.renderer, target);
+      this.composer.addPass(new RenderPass(this.scene, this.camera));
+      const gtao = new GTAOPass(this.scene, this.camera, 1, 1);
+      gtao.updateGtaoMaterial({ radius: 0.35, distanceExponent: 1.5, thickness: 1, scale: 1.2 });
+      gtao.blendIntensity = 0.85;
+      this.composer.addPass(gtao);
+      this.composer.addPass(new OutputPass());
+    }
 
     this.orbit = new OrbitControls(this.camera, this.renderer.domElement);
     this.orbit.target.set(0, 0.4, 0);
@@ -82,6 +123,8 @@ export class Stage {
     const w = this.container.clientWidth || 1;
     const h = this.container.clientHeight || 1;
     this.renderer.setSize(w, h, false);
+    this.composer?.setPixelRatio(this.renderer.getPixelRatio());
+    this.composer?.setSize(w, h);
     this.camera.aspect = w / h;
     this.camera.updateProjectionMatrix();
     if (this.mode !== "free" && this.mode !== "follow") this.applyCamera();
@@ -232,13 +275,15 @@ export class Stage {
   }
 
   render(): void {
-    this.renderer.render(this.scene, this.camera);
+    if (this.composer) this.composer.render();
+    else this.renderer.render(this.scene, this.camera);
   }
 
   dispose(): void {
     this.cleanup.forEach((fn) => fn());
     this.resizeObserver.disconnect();
     this.orbit.dispose();
+    this.composer?.dispose();
     this.renderer.dispose();
     this.renderer.domElement.remove();
   }
