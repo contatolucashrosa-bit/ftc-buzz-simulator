@@ -40,6 +40,23 @@ export function solveApexLaunch(horizontalIn: number, riseIn: number): { speed: 
   return { speed: Math.hypot(vx, vy), pitchDeg: (Math.atan2(vy, vx) * 180) / Math.PI };
 }
 
+/**
+ * Onde parar e como mirar para lançar na CELL de cima da HIVE de uma aliança.
+ * `upSide` = lado da CELL de cima (-1: abertura virada para a plateia, -y; +1: para o fundo, +y).
+ * `exit` = saída do lançador do robô (pol à frente do centro e altura).
+ */
+export function hiveShot(alliance: "red" | "blue", upSide: 1 | -1, exit: { forward: number; z: number }, standoff = 58) {
+  const tilt = (HIVE.tiltDeg * Math.PI) / 180;
+  const openingLz = HIVE.cellBottomZ + 6.5;
+  // alvo: um pouco para dentro da abertura da CELL, medido a partir do eixo da HIVE
+  const targetY = upSide * ((HIVE.cellInnerY + HIVE.cellDepth) * Math.cos(tilt) - openingLz * Math.sin(tilt) - 1.5);
+  const targetZ = (HIVE.cellInnerY + HIVE.cellDepth) * Math.sin(tilt) + openingLz * Math.cos(tilt) + HIVE.pivotHeight;
+  const y = upSide * standoff;
+  const heading = upSide < 0 ? Math.PI / 2 : -Math.PI / 2;
+  const aim = solveApexLaunch(Math.abs(targetY - y) - exit.forward, targetZ - exit.z);
+  return { x: HIVE.centerX[alliance], y, heading, aim };
+}
+
 export function buildAutoSteps(id: AutoProgramId): AutoStep[] {
   const park: AutoStep[] = [
     { kind: "goTo", x: -45, y: -50, heading: 0 },
@@ -55,15 +72,11 @@ export function buildAutoSteps(id: AutoProgramId): AutoStep[] {
       return [{ kind: "goTo", x: -55, y: RED_START.y, heading: 0 }, ...park.slice(1)];
     case "scorePreload": {
       // CELL de cima da HIVE vermelha começa do lado da plateia (-y), com a abertura virada para -y.
-      const shootY = -58;
-      const tilt = (HIVE.tiltDeg * Math.PI) / 180;
-      const openingLz = HIVE.cellBottomZ + 6.5;
-      const targetY = -(HIVE.cellInnerY + HIVE.cellDepth) * Math.cos(tilt) + openingLz * Math.sin(tilt) + 1.5;
-      const targetZ = (HIVE.cellInnerY + HIVE.cellDepth) * Math.sin(tilt) + openingLz * Math.cos(tilt) + HIVE.pivotHeight;
-      const aim = solveApexLaunch(targetY - (shootY + LAUNCH_EXIT.forward), targetZ - LAUNCH_EXIT.z);
+      const shot = hiveShot("red", -1, LAUNCH_EXIT);
+      const aim = shot.aim;
       return [
         { kind: "goTo", x: -50, y: RED_START.y, heading: 0 },
-        { kind: "goTo", x: HIVE.centerX.red, y: shootY, heading: Math.PI / 2 },
+        { kind: "goTo", x: shot.x, y: shot.y, heading: shot.heading },
         { kind: "aim", speed: aim.speed, pitchDeg: aim.pitchDeg },
         { kind: "wait", seconds: 0.4 },
         { kind: "launchAll", timeoutS: 4 },
