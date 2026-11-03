@@ -21,7 +21,7 @@ export const CAMERA_LABELS: Record<CameraMode, string> = {
 };
 
 /** Campo de visão por câmera: a do piloto é mais aberta para caber a HIVE (65,6 pol de altura) e o campo perto. */
-const CAMERA_FOV: Record<CameraMode, number> = { audience: 50, driver: 62, follow: 60, top: 50, free: 50 };
+const CAMERA_FOV: Record<CameraMode, number> = { audience: 40, driver: 62, follow: 60, top: 50, free: 50 };
 
 /** Órbita da câmera "Seguir robô": guinada relativa às costas do robô, inclinação e distância. */
 export interface FollowOrbit {
@@ -49,6 +49,7 @@ export class Stage {
   readonly camera = new THREE.PerspectiveCamera(50, 1, 0.05, 60);
   readonly renderer: THREE.WebGLRenderer;
   private composer: EffectComposer | null = null;
+  private gtao: GTAOPass | null = null;
   mode: CameraMode = "audience";
   readonly followOrbit: FollowOrbit = { ...DEFAULT_ORBIT };
   private readonly orbit: OrbitControls;
@@ -102,6 +103,7 @@ export class Stage {
       this.composer = new EffectComposer(this.renderer, target);
       this.composer.addPass(new RenderPass(this.scene, this.camera));
       const gtao = new GTAOPass(this.scene, this.camera, 1, 1);
+      this.gtao = gtao;
       gtao.updateGtaoMaterial({ radius: 0.35, distanceExponent: 1.5, thickness: 1, scale: 1.2 });
       gtao.blendIntensity = 0.85;
       this.composer.addPass(gtao);
@@ -125,6 +127,9 @@ export class Stage {
     this.renderer.setSize(w, h, false);
     this.composer?.setPixelRatio(this.renderer.getPixelRatio());
     this.composer?.setSize(w, h);
+    // oclusão em meia resolução: o efeito é suave e custa 1/4 (o cenário inteiro passa pelo GTAO)
+    const pr = this.renderer.getPixelRatio();
+    this.gtao?.setSize(Math.max(1, Math.round((w * pr) / 2)), Math.max(1, Math.round((h * pr) / 2)));
     this.camera.aspect = w / h;
     this.camera.updateProjectionMatrix();
     if (this.mode !== "free" && this.mode !== "follow") this.applyCamera();
@@ -233,7 +238,8 @@ export class Stage {
     const sign = this.driverSide === "red" ? -1 : 1;
     if (this.mode === "audience") {
       const k = this.distanceScale();
-      this.camera.position.copy(toWorld(0, -150 * k, 95 * k));
+      // mais longe e com lente mais fechada, como a câmera de transmissão: o campo inteiro e as equipes menores nas bordas
+      this.camera.position.copy(toWorld(0, -205 * k, 125 * k));
       this.camera.lookAt(toWorld(0, -6, 0));
     } else if (this.mode === "driver") {
       const k = this.distanceScale();
