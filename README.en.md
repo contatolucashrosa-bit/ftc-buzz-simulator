@@ -93,7 +93,7 @@ The source of truth for the rules is the official *BIOBUZZ Competition Manual*, 
 - [Deploy and offline use](#-deploy-and-offline-use)
 - [Notices](#️-notices)
 - [License](#-license)
-- [Author](#-author)
+- [Author](#‍-author)
 
 ---
 
