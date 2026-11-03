@@ -1,0 +1,12 @@
+{
+  "name": "Buzz Simulator",
+  "short_name": "Buzz Sim",
+  "description": "Simulador de FTC BIOBUZZ no navegador, offline e gratuito. Criado por Lucas Hochmann Rosa em parceria com WestSharksFTC #24823.",
+  "lang": "pt-BR",
+  "start_url": "./",
+  "scope": "./",
+  "display": "standalone",
+  "background_color": "#0b0c0f",
+  "theme_color": "#000000",
+  "icons": [{ "src": "icon.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "any" }]
+}

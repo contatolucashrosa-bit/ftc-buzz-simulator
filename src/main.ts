@@ -8,3 +8,13 @@ import "./styles/main.css";
 import { App } from "./ui/app";
 
 new App(document.getElementById("app")!).start();
+
+// Modo offline (PWA): guarda o app neste aparelho depois do primeiro acesso. Só no build de produção,
+// para não atrapalhar o recarregamento automático do servidor de desenvolvimento.
+if (import.meta.env.PROD && "serviceWorker" in navigator) {
+  window.addEventListener("load", () => {
+    navigator.serviceWorker.register("./sw.js").catch(() => {
+      // sem service worker (ex.: aberto via file://): o app continua funcionando online
+    });
+  });
+}
