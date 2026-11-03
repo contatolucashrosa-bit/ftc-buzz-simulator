@@ -51,7 +51,7 @@ function floorTexture(): { map: THREE.CanvasTexture; bump: THREE.CanvasTexture }
   // TILES de espuma cinza (6 × 6, §9.2): cada um com tom levemente diferente e textura de poros
   for (let i = 0; i < 6; i++) {
     for (let j = 0; j < 6; j++) {
-      const shade = 76 + Math.round(rand() * 8);
+      const shade = 150 + Math.round(rand() * 10);
       ctx.fillStyle = `rgb(${shade},${shade + 1},${shade + 5})`;
       ctx.fillRect(i * 24 * px, j * 24 * px, 24 * px, 24 * px);
     }
@@ -69,7 +69,7 @@ function floorTexture(): { map: THREE.CanvasTexture; bump: THREE.CanvasTexture }
   }
 
   // juntas com encaixe
-  ctx.strokeStyle = "rgba(20,21,25,0.5)";
+  ctx.strokeStyle = "rgba(60,62,68,0.45)";
   ctx.lineWidth = 1.5;
   bump.strokeStyle = "#202020";
   bump.lineWidth = 2;
@@ -123,18 +123,16 @@ export function buildField(physics: PhysicsWorld, scene: THREE.Scene): void {
   floor.receiveShadow = true;
   scene.add(floor);
 
-  // Tablado do evento ao redor do campo (o gramado fica por conta do cenário) e ALLIANCE AREAS (97 × 54 pol, §9.3; vermelha à esquerda da plateia, §9.5)
-  const outside = new THREE.Mesh(
-    new THREE.PlaneGeometry(7.4, 5.2),
-    new THREE.MeshStandardMaterial({ color: 0x3a3e46, roughness: 1 }),
-  );
-  outside.rotation.x = -Math.PI / 2;
-  outside.position.y = -0.002;
-  scene.add(outside);
+  // Base escura sob o campo (aparece como uma borda rente à grama) e ALLIANCE AREAS (97 × 54 pol, §9.3;
+  // vermelha à esquerda da plateia, §9.5), só como um tom suave na grama
+  const base = new THREE.Mesh(new THREE.BoxGeometry(size + 0.16, 0.03, size + 0.16), new THREE.MeshStandardMaterial({ color: 0x1e1f22, roughness: 0.8 }));
+  base.position.y = -0.016;
+  base.receiveShadow = true;
+  scene.add(base);
   for (const [alliance, sign] of [["red", -1], ["blue", 1]] as const) {
     const area = new THREE.Mesh(
       new THREE.PlaneGeometry(54 * INCH, 97 * INCH),
-      new THREE.MeshStandardMaterial({ color: ALLIANCE_COLORS[alliance], transparent: true, opacity: 0.35 }),
+      new THREE.MeshStandardMaterial({ color: ALLIANCE_COLORS[alliance], transparent: true, opacity: 0.1, depthWrite: false }),
     );
     area.rotation.x = -Math.PI / 2;
     const p = toWorld(sign * (FIELD.half + 2 + 27), 0, 0);
@@ -142,9 +140,9 @@ export function buildField(physics: PhysicsWorld, scene: THREE.Scene): void {
     scene.add(area);
   }
 
-  // Perímetro: policarbonato transparente com trilho de alumínio no topo
-  const wallMat = new THREE.MeshStandardMaterial({ color: 0xcfe3ff, transparent: true, opacity: 0.18, depthWrite: false });
-  const railMat = new THREE.MeshStandardMaterial({ color: 0x9a989a, metalness: 0.6, roughness: 0.4 });
+  // Perímetro: policarbonato transparente com perfis pretos no topo e na base (como no CAD e no vídeo da temporada)
+  const wallMat = new THREE.MeshStandardMaterial({ color: 0xdfeaf2, transparent: true, opacity: 0.14, roughness: 0.08, metalness: 0.1, depthWrite: false });
+  const railMat = new THREE.MeshStandardMaterial({ color: 0x18191c, metalness: 0.4, roughness: 0.45 });
   const h = FIELD.wallHeight;
   const t = FIELD.wallThickness;
   const walls: Array<[number, number, number, number]> = [
@@ -166,7 +164,11 @@ export function buildField(physics: PhysicsWorld, scene: THREE.Scene): void {
     scene.add(wall);
     const rail = new THREE.Mesh(new THREE.BoxGeometry(hx * 2 * INCH + 0.01, 1.5 * INCH, hy * 2 * INCH + 0.01), railMat);
     rail.position.copy(toWorld(x, y, h));
+    rail.castShadow = true;
     scene.add(rail);
+    const foot = new THREE.Mesh(new THREE.BoxGeometry(hx * 2 * INCH + 0.01, 1.2 * INCH, hy * 2 * INCH + 0.012), railMat);
+    foot.position.copy(toWorld(x, y, 0.6));
+    scene.add(foot);
   }
 
   buildHiveFrame(physics, scene, ground);
@@ -174,7 +176,7 @@ export function buildField(physics: PhysicsWorld, scene: THREE.Scene): void {
 
 /** Estrutura triangular da HIVE (§9.6.1, Fig. 9-8): dois "A" ligados por uma travessa no topo. */
 function buildHiveFrame(physics: PhysicsWorld, scene: THREE.Scene, ground: RAPIER.RigidBody): void {
-  const mat = new THREE.MeshStandardMaterial({ color: 0x9a989a, metalness: 0.7, roughness: 0.35 });
+  const mat = new THREE.MeshStandardMaterial({ color: 0x6f7278, metalness: 0.6, roughness: 0.4 });
   const halfDepth = HIVE.frameDepth / 2;
   const apex = HIVE.pivotHeight + 1.5;
   const legLength = Math.hypot(halfDepth, apex);

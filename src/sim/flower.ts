@@ -16,8 +16,11 @@ export class Flower {
     scene: THREE.Scene,
   ) {
     const body = physics.world.createRigidBody(RAPIER.RigidBodyDesc.fixed());
-    const material = new THREE.MeshStandardMaterial({ color: 0xe8e8e8, roughness: 0.35, metalness: 0.1 });
-    const ringMaterial = new THREE.MeshStandardMaterial({ color: 0xbba13e, roughness: 0.5 }); // dourado BIOBUZZ
+    // cores da FLOWER no vídeo da temporada: canos verdes, anel do topo amarelo, batente roxo e base preta
+    const pipeMaterial = new THREE.MeshStandardMaterial({ color: 0x3fae3a, roughness: 0.45 });
+    const darkMaterial = new THREE.MeshStandardMaterial({ color: 0x26272b, roughness: 0.55, metalness: 0.2 });
+    const topMaterial = new THREE.MeshStandardMaterial({ color: 0xf2c31b, roughness: 0.45 });
+    const backstopMaterial = new THREE.MeshStandardMaterial({ color: 0x8a3fc4, roughness: 0.5 });
     const group = new THREE.Group();
     const base = toWorld(spec.x, spec.y, 0);
     group.position.copy(base);
@@ -45,7 +48,7 @@ export class Flower {
     };
 
     // Anel aproximado por segmentos retos tangentes (colisor) + um toro (visual).
-    const addRing = (innerRadius: number, width: number, zBottom: number, thickness: number, groups?: number) => {
+    const addRing = (innerRadius: number, width: number, zBottom: number, thickness: number, ringMaterial: THREE.Material, groups?: number) => {
       const segments = 12;
       const mid = innerRadius + width / 2;
       const half = ((Math.PI * 2 * mid) / segments) * 0.55;
@@ -59,13 +62,13 @@ export class Flower {
     };
 
     // anel de baixo (no piso): o POLLEN fica dentro dele
-    addRing(FLOWER.lowerRingHoleRadius + 0.08, 0.8, 0, FLOWER.lowerRingHeight);
+    addRing(FLOWER.lowerRingHoleRadius + 0.08, 0.8, 0, FLOWER.lowerRingHeight, darkMaterial);
     // anel do meio: segura só NECTAR. O POLLEN passa pelo furo; com grupos de colisão a passagem não depende
     // de milímetros de folga (o contato preditivo do Rapier chegava a segurar o POLLEN no ar).
     const middleBottom = FLOWER.lowerRingHeight + FLOWER.retrievalHeight;
-    addRing(FLOWER.middleRingHoleRadius, 1.0, middleBottom, FLOWER.middleRingThickness, interactionGroups(COLLISION.all, COLLISION.nectar));
+    addRing(FLOWER.middleRingHoleRadius, 1.0, middleBottom, FLOWER.middleRingThickness, darkMaterial, interactionGroups(COLLISION.all, COLLISION.nectar));
     // anel do topo
-    addRing(FLOWER.topOpeningRadius, 0.8, FLOWER.topHeight - 0.4, 0.4);
+    addRing(FLOWER.topOpeningRadius, 0.8, FLOWER.topHeight - 0.4, 0.4, topMaterial);
 
     // 4 canos (HIPS) entre o anel do meio e o do topo
     const pipeBottom = middleBottom + FLOWER.middleRingThickness;
@@ -80,7 +83,8 @@ export class Flower {
           .setFrictionCombineRule(RAPIER.CoefficientCombineRule.Min),
         body,
       );
-      const pipe = new THREE.Mesh(new THREE.CylinderGeometry(FLOWER.pipeRadius * INCH, FLOWER.pipeRadius * INCH, pipeHalf * 2 * INCH, 10), material);
+      const pipe = new THREE.Mesh(new THREE.CylinderGeometry(FLOWER.pipeRadius * INCH, FLOWER.pipeRadius * INCH, pipeHalf * 2 * INCH, 12), pipeMaterial);
+      pipe.castShadow = true;
       pipe.position.copy(p).sub(base);
       group.add(pipe);
     }
@@ -89,7 +93,7 @@ export class Flower {
     const wx = -spec.inward.x;
     const wy = -spec.inward.y;
     const wallYaw = Math.atan2(wy, wx);
-    addBox(wx * (CAGE_RADIUS + 0.6), wy * (CAGE_RADIUS + 0.6), pipeBottom / 2, 0.5, 0.5, pipeBottom / 2, wallYaw, material);
+    addBox(wx * (CAGE_RADIUS + 0.6), wy * (CAGE_RADIUS + 0.6), pipeBottom / 2, 0.5, 0.5, pipeBottom / 2, wallYaw, darkMaterial);
     addBox(
       wx * (FLOWER.topOpeningRadius + 0.3),
       wy * (FLOWER.topOpeningRadius + 0.3),
@@ -98,7 +102,7 @@ export class Flower {
       FLOWER.topOpeningRadius,
       FLOWER.backstopHeight / 2,
       wallYaw,
-      material,
+      backstopMaterial,
     );
   }
 

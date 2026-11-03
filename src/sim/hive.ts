@@ -3,6 +3,7 @@
 // A HIVE é um corpo cinemático: só vira por peso na CELL de cima (G417 proíbe outras formas),
 // então robôs não conseguem empurrá-la. O limiar de massa é suposição (o manual não informa).
 import * as THREE from "three";
+import { mergeGeometries } from "three/examples/jsm/utils/BufferGeometryUtils.js";
 import type { Alliance } from "../rules/rules";
 import { ELEMENTS, HIVE, HIVE_INITIAL_UP_SIDE, INCH, toWorld } from "./geometry";
 import type { ElementManager, GameElement } from "./elements";
@@ -120,8 +121,10 @@ export class Hive {
         .setRotation(quatAboutX(this.logic.angle)),
     );
 
-    const panel = new THREE.MeshStandardMaterial({ color, transparent: true, opacity: 0.32, side: THREE.DoubleSide, depthWrite: false });
-    const frameMat = new THREE.MeshStandardMaterial({ color, roughness: 0.4 });
+    // como no vídeo da temporada: painéis de policarbonato transparente e molduras de perfil na cor da aliança
+    const panel = new THREE.MeshStandardMaterial({ color: 0xe6edf2, transparent: true, opacity: 0.22, roughness: 0.15, side: THREE.DoubleSide, depthWrite: false });
+    const frameMat = new THREE.MeshStandardMaterial({ color, roughness: 0.4, metalness: 0.25 });
+    const frameParts: THREE.BufferGeometry[] = [];
     const boxes: LocalBox[] = [...cellBoxes(1), ...cellBoxes(-1)];
     // barra que liga as CELLS
     boxes.push({ cx: 0, cy: 0, cz: HIVE.cellBottomZ - 1.2, hx: 1, hy: HIVE.cellInnerY + 0.5, hz: 1 });
@@ -142,12 +145,24 @@ export class Hive {
       mesh.quaternion.copy(rotation);
       this.group.add(mesh);
       if (!isBar) {
-        const edges = new THREE.LineSegments(new THREE.EdgesGeometry(mesh.geometry), new THREE.LineBasicMaterial({ color }));
-        edges.position.copy(mesh.position);
-        edges.quaternion.copy(mesh.quaternion);
-        this.group.add(edges);
+        // cada aresta da placa vira um perfil quadrado de 0,9 pol (todas juntas numa malha só)
+        mesh.updateMatrix();
+        const edges = new THREE.EdgesGeometry(mesh.geometry).applyMatrix4(mesh.matrix).attributes.position;
+        for (let i = 0; i < edges.count; i += 2) {
+          const a = new THREE.Vector3().fromBufferAttribute(edges, i);
+          const b = new THREE.Vector3().fromBufferAttribute(edges, i + 1);
+          const length = a.distanceTo(b);
+          if (length < 0.6 * INCH) continue; // arestas da espessura da placa
+          const strut = new THREE.BoxGeometry(0.9 * INCH, length + 0.9 * INCH, 0.9 * INCH);
+          strut.applyQuaternion(new THREE.Quaternion().setFromUnitVectors(new THREE.Vector3(0, 1, 0), b.clone().sub(a).normalize()));
+          strut.translate((a.x + b.x) / 2, (a.y + b.y) / 2, (a.z + b.z) / 2);
+          frameParts.push(strut);
+        }
       }
     }
+    const frame = new THREE.Mesh(mergeGeometries(frameParts)!, frameMat);
+    frame.castShadow = true;
+    this.group.add(frame);
     this.group.position.copy(this.pivot);
     scene.add(this.group);
     this.syncVisual();
