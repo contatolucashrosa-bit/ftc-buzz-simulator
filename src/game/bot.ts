@@ -35,6 +35,8 @@ export interface BotWorld {
   allies(): Array<{ x: number; y: number }>;
   /** Segundos de partida restantes (Infinity no treino livre). */
   secondsLeft(): number;
+  /** Período AUTO: atravessar para o lado adversário e encostar num robô de lá é MAJOR (G402). */
+  isAuto(): boolean;
 }
 
 export interface BotOutput {
@@ -183,8 +185,11 @@ export class BotBrain {
     const others = world.others();
     let best: { id: number; x: number; y: number } | null = null;
     let bestCost = Infinity;
+    const auto = world.isAuto();
     for (const p of world.pickups()) {
       if (!reachable(p)) continue;
+      // no AUTO, fica no próprio lado com folga (o robô tem ~9 pol do centro até a borda)
+      if (auto && (this.alliance === "red" ? p.x > -12 : p.x < 12)) continue;
       const d = Math.hypot(p.x - pose.x, p.y - pose.y);
       // evita disputar com um robô que já está mais perto
       const contested = others.some((o) => Math.hypot(p.x - o.x, p.y - o.y) < d * 0.7 && Math.hypot(p.x - o.x, p.y - o.y) < 18);

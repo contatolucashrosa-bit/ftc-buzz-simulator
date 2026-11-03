@@ -15,6 +15,7 @@ import { Robot, robotConfigFromPreset } from "../sim/robot";
 import { Environment } from "../render/environment";
 import { SoundBoard } from "../render/audio";
 import { ReplayPlayer, ReplayRecorder } from "./replay";
+import { FoulMonitor, type FoulRobot } from "./fouls";
 import { BotBrain, type BotLevel, type BotWorld } from "./bot";
 import { ROBOT_PRESETS, type RobotPresetId as BotPresetId } from "../config/robotPresets";
 import { HardwareBus } from "../java/hardwareBus";
@@ -210,6 +211,7 @@ export class Game {
   };
   private autoResult: Record<Alliance, { leave: [boolean, boolean]; park: [boolean, boolean] }> | null = null;
   private readonly fouls: FoulEntry[] = [];
+  private readonly foulMonitor = new FoulMonitor();
   private readonly messages: Array<{ text: string; until: number }> = [];
   private finalScore: MatchScore | null = null;
   private readonly recorder = new ReplayRecorder();
@@ -487,6 +489,7 @@ export class Game {
       others: () => all.filter((r) => r !== robot).map((r) => r.pose()),
       allies: () => this.robotsOf(bot.alliance).filter((r) => r !== robot).map((r) => r.pose()),
       secondsLeft: () => (this.options.mode === "practice" ? Infinity : clock.matchSecondsRemaining),
+      isAuto: () => this.options.mode === "match" && clock.phase === "auto",
     };
   }
 
@@ -777,7 +780,8 @@ export class Game {
     }
 
     this.checkEarlyNectarInFlowers(after);
-    this.handleOutOfField();
+    this.handleOutOfField(after);
+    if (this.options.mode === "match" && enabled) this.checkContactFouls(dt, after);
 
     if (this.options.mode === "match") {
       if (before.phase === "auto" && after.phase !== "auto") {
@@ -867,18 +871,55 @@ export class Game {
     }
   }
 
+  /** G402 e G421: contato entre robôs de alianças diferentes. */
+  private checkContactFouls(dt: number, clock: ClockState): void {
+    const robots: FoulRobot[] = [
+      { robot: this.robot, key: "red-1" },
+      ...this.bots.map((b) => ({ robot: b.robot, key: `${b.alliance}-${b.slot + 1}` })),
+    ].map(({ robot, key }) => ({
+      key,
+      alliance: robot.config.alliance,
+      footprint: robot.footprint(),
+      velocity: robot.velocityIn(),
+      push: robot.push,
+      blocked: robot.touchingWall(1.5),
+    }));
+    if (robots.length < 2) return;
+    for (const event of this.foulMonitor.update(dt, robots, clock.phase === "auto")) this.addFoul(event.rule, event.alliance, event.penalty, event.text, clock);
+  }
+
+  private addFoul(rule: string, alliance: Alliance, penalty: "minor" | "major", text: string, clock: ClockState): void {
+    this.fouls.push({ rule, alliance, penalty, text, clock: formatClock(clock.displaySeconds) });
+    const who = alliance === "red" ? "vermelha" : "azul";
+    this.flash(`${penalty === "major" ? "MAJOR" : "MINOR"} FOUL (${rule}) da aliança ${who}: ${text}`);
+  }
+
   /** Elementos fora do campo: POLLEN volta pelo staff; NECTAR volta para a equipe (§10.8.2). */
-  private handleOutOfField(): void {
+  private handleOutOfField(clock: ClockState): void {
     const now = this.elapsed;
     for (const e of [...this.elements.elements]) {
       const p = this.elements.position(e);
       const out = Math.abs(p.x) > FIELD.half + 2 || Math.abs(p.y) > FIELD.half + 2 || p.z < -6;
       if (!out) {
         e.outSince = null;
+        // assentou: daqui em diante sair do campo não é mais culpa do lançamento
+        if (e.launch) {
+          const v = e.body.linvel();
+          if (Math.hypot(v.x, v.y, v.z) < 0.15) e.launch = null;
+        }
         continue;
       }
       e.outSince ??= now;
       if (now - e.outSince < 1.5 && p.z > -6) continue;
+      // G405 pune ejetar de propósito; um arremesso errado na HIVE não é falta. Sem árbitro, a intenção
+      // é estimada pela mira: lançado para longe da própria HIVE (mais de 90° de desvio) e saiu do campo.
+      if (e.launch && e.lastLaunchedBy && this.options.mode === "match" && clock.phase !== "pre") {
+        const hx = HIVE.centerX[e.lastLaunchedBy] - e.launch.x;
+        const hy = -e.launch.y;
+        if (hx * Math.cos(e.launch.heading) + hy * Math.sin(e.launch.heading) < 0) {
+          this.addFoul("G405", e.lastLaunchedBy, "major", "lançou um elemento para fora do campo", clock);
+        }
+      }
       const owner = allianceOfNectar(e.kind);
       this.elements.remove(e);
       if (owner) {

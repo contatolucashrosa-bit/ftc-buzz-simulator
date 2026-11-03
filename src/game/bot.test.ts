@@ -18,6 +18,7 @@ function world(overrides: Partial<BotWorld> & { at?: { x: number; y: number; hea
     others: () => [],
     allies: () => [],
     secondsLeft: () => 100,
+    isAuto: () => false,
   };
   return Object.assign(w, overrides);
 }
@@ -59,6 +60,12 @@ describe("robô-bot", () => {
     brain.update(0.01, w);
     expect(brain.currentState).toBe("toShoot");
     expect(w.bursts).toBe(0);
+  });
+
+  it("no AUTO não vai buscar POLLEN no lado adversário (G402)", () => {
+    const brain = new BotBrain("blue", "hard", () => 0.5);
+    brain.update(0.01, world({ hopper: 1, at: { x: 30, y: 0, heading: Math.PI }, isAuto: () => true, pickups: () => [{ id: 1, x: -20, y: 0, z: 1.4 }] }));
+    expect(brain.currentState).toBe("toShoot");
   });
 
   it("estaciona na LOADING ZONE nos últimos segundos", () => {

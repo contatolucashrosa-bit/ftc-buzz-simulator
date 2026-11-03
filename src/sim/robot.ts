@@ -99,6 +99,8 @@ export class Robot {
   private servoTime = 0;
   /** Chamado a cada elemento lançado (sons, estatísticas). */
   onLaunch: (() => void) | null = null;
+  /** Direção em que o comando atual tenta levar o robô, no campo (-1..1), para a falta de PIN. */
+  push = { x: 0, y: 0 };
   private servoCooldown = 0;
 
   constructor(
@@ -302,6 +304,12 @@ export class Robot {
     return { x: t.x / INCH, y: -t.z / INCH, heading: yawOf(this.body.rotation()) };
   }
 
+  /** Velocidade real no campo (pol/s). */
+  velocityIn(): { x: number; y: number } {
+    const v = this.body.linvel();
+    return { x: v.x / INCH, y: -v.z / INCH };
+  }
+
   /** Cantos da base (pol), para LEAVE e PARK. */
   footprint(): Array<{ x: number; y: number }> {
     const { x, y, heading } = this.pose();
@@ -356,6 +364,7 @@ export class Robot {
     // velocidade desejada no manual (x, y), depois no mundo (x, -y)
     const vxField = (fwd * Math.cos(heading) - str * Math.sin(heading)) * this.config.maxSpeed;
     const vyField = (fwd * Math.sin(heading) + str * Math.cos(heading)) * this.config.maxSpeed;
+    this.push = { x: vxField / this.config.maxSpeed, y: vyField / this.config.maxSpeed };
     const target = new THREE.Vector2(vxField, -vyField);
     const delta = target.clone().sub(this.velocity);
     const maxDelta = this.config.maxAccel * dt;
@@ -438,6 +447,7 @@ export class Robot {
     const p = this.exitPoint(this.launchExit);
     const e = elements.spawn(kind, p.x, p.y, p.z, this.launchVelocity());
     e.lastLaunchedBy = this.config.alliance;
+    e.launch = this.pose();
     this.cooldown = this.config.launchIntervalS;
     this.onLaunch?.();
     return kind;
@@ -512,6 +522,7 @@ export class Robot {
     const p = this.exitPoint(this.placeExit);
     const e = elements.spawn(kind, p.x, p.y, p.z);
     e.lastLaunchedBy = this.config.alliance;
+    e.launch = this.pose();
     this.cooldown = 0.4;
     return kind;
   }

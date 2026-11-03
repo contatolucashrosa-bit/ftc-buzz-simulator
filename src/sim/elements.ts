@@ -19,6 +19,8 @@ export interface GameElement {
   lastLaunchedBy: Alliance | null;
   /** Já gerou falta G410 nesta partida. */
   earlyFlowerFoul: boolean;
+  /** De onde e para onde um robô lançou este elemento, até ele assentar (para G405). */
+  launch: { x: number; y: number; heading: number } | null;
   /** Momento (s de simulação) em que saiu do campo, ou null. */
   outSince: number | null;
 }
@@ -165,6 +167,7 @@ export class ElementManager {
       lastLaunchedBy: null,
       earlyFlowerFoul: false,
       outSince: null,
+      launch: null,
     };
     this.elements.push(element);
     this.syncOne(element);
