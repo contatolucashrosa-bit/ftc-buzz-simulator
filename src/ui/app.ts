@@ -13,9 +13,10 @@ import { bindRanking, rankingHtml } from "./ranking";
 import { getProject, listProjects, opModeRef, parseOpModeRef, type HardwareUse } from "../java/project";
 import type { JavaOpModeRun, JavaSetup } from "../game/game";
 import { bindTeamRobots, teamRobotsHtml } from "./teamRobots";
+import { firstHtml, homeHtml } from "./home";
 import { BOT_LEVELS, type BotLevel } from "../game/bot";
 
-type Route = "home" | "setup" | "workshop" | "leaderboard" | "teamRobots" | "about";
+type Route = "home" | "setup" | "workshop" | "leaderboard" | "teamRobots" | "first" | "about";
 
 const NAV: Array<[Route, string]> = [
   ["home", "Início"],
@@ -23,6 +24,7 @@ const NAV: Array<[Route, string]> = [
   ["workshop", "Oficina"],
   ["leaderboard", "Placares"],
   ["teamRobots", "Robôs da equipe"],
+  ["first", "Conheça a FIRST"],
   ["about", "Sobre"],
 ];
 
@@ -79,6 +81,8 @@ export class App {
     if (import.meta.env.DEV && query.has("autoplay")) {
       const quality = query.get("quality");
       if (quality === "low" || quality === "medium" || quality === "high") this.prefs = { ...this.prefs, quality };
+      // &clean: só o 3D, sem HUD nem placar (imagens para a página inicial)
+      if (query.has("clean")) document.head.insertAdjacentHTML("beforeend", "<style>.game > :not(.stage-host) { display: none !important; }</style>");
       void this.play("practice").then(() => {
         const cam = query.get("cam");
         const debug = (window as unknown as { __buzz?: { camera(mode: string): void } }).__buzz;
@@ -103,7 +107,8 @@ export class App {
     this.teardown();
     if (pushHash && location.hash !== `#${route}`) history.replaceState(null, "", `#${route}`);
     const pages: Record<Route, () => string> = {
-      home: () => this.homeHtml(),
+      home: () => homeHtml(loadStats().matchesPlayed),
+      first: () => firstHtml(),
       setup: () => this.setupHtml(),
       workshop: () => `<div data-workshop><p class="lead">Carregando a Oficina…</p></div>`,
       leaderboard: () => rankingHtml(),
@@ -147,32 +152,6 @@ export class App {
           <span>Licença ${APP.license} · v${APP.version} · Projeto independente, não afiliado à <em>FIRST</em>®.</span>
         </div>
       </footer>`;
-  }
-
-  private homeHtml(): string {
-    const stats = loadStats();
-    return `
-      <section class="hero">
-        <span class="badge">Temporada 2026-2027 · BIOBUZZ™ presented by RTX</span>
-        <h1>Buzz <span>Simulator</span></h1>
-        <p class="lead">${APP.tagline} Treine o AUTO e o TELEOP do BIOBUZZ™ com as regras do manual oficial, sem precisar do robô físico.</p>
-        <div class="actions">
-          <button class="btn btn-primary" data-go="setup">Jogar no navegador</button>
-          <button class="btn btn-secondary" data-play="practice">Treino livre agora</button>
-        </div>
-        <ul class="platforms" aria-label="Plataformas">
-          <li>Windows</li><li>macOS</li><li>Linux</li><li>Chromebook</li><li>Tablet</li>
-        </ul>
-        <p class="notice" style="margin-top:16px">Funciona direto no navegador, <strong>sem instalação, sem conta e sem servidor</strong>. Tudo fica neste aparelho.
-        ${stats.matchesPlayed > 0 ? `Partidas jogadas neste aparelho: <strong>${stats.matchesPlayed}</strong>.` : ""}</p>
-      </section>
-      <section class="cards" aria-label="Modos">
-        <div class="card"><h3>Treino livre <span class="badge badge-ok">pronto</span></h3><p>Sem relógio: dirija, colete POLLEN, vire a HIVE e encha as FLOWERS no seu ritmo.</p><button class="btn btn-secondary btn-small" data-play="practice">Treinar</button></div>
-        <div class="card"><h3>Partida completa <span class="badge badge-ok">pronto</span></h3><p>AUTO de 30 s, transição de 8 s e TELEOP de 2:00, com placar, RANKING POINTS e faltas automáticas.</p><button class="btn btn-secondary btn-small" data-go="setup">Configurar</button></div>
-        <div class="card"><h3>Oficina <span class="badge badge-ok">CAD pronto</span></h3><p>Importe o CAD do seu robô (GLB, STL ou STEP) e jogue com ele. Código Java do Android Studio em seguida.</p><button class="btn btn-secondary btn-small" data-go="workshop">Abrir Oficina</button></div>
-        <div class="card"><h3>Placares <span class="badge badge-ok">pronto</span></h3><p>Ranking de qualificação deste aparelho, histórico de partidas e ranking da turma por arquivo.</p><button class="btn btn-secondary btn-small" data-go="leaderboard">Ver ranking</button></div>
-      </section>
-      <p class="notice">${DISCLAIMER}</p>`;
   }
 
   private setupHtml(): string {

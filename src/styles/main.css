@@ -322,3 +322,48 @@ h1, h2, h3 { line-height: 1.2; margin: 0 0 0.5em; }
 .field-row label { font-weight: 700; }
 .field-row select { padding: 8px 10px; border-radius: 8px; border: 1px solid var(--border); background: var(--surface); color: var(--text); font: inherit; }
 .choice input[type="checkbox"] { margin-top: 4px; }
+
+/* ---------- página inicial e "Conheça a FIRST" ---------- */
+.btn-ghost { background: transparent; color: var(--buzz-yellow); border-color: transparent; }
+.btn-ghost:hover { border-color: var(--buzz-yellow); }
+.section-title { margin: 40px 0 12px; font-size: 1.5rem; }
+.home-hero { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1.1fr); gap: 32px; align-items: center; padding: 32px 0 8px; }
+.home-hero h1 { font-size: clamp(2.2rem, 5.5vw, 3.6rem); font-weight: 900; letter-spacing: -0.02em; margin: 12px 0 8px; line-height: 1.05; }
+.home-hero h1 span { color: var(--buzz-yellow); }
+.home-hero .lead { font-size: 1.1rem; color: var(--text-muted); }
+.home-hero .actions { display: flex; gap: 12px; flex-wrap: wrap; margin-top: 20px; }
+.home-hero-shot, .season figure { margin: 0; border-radius: 14px; overflow: hidden; border: 1px solid var(--border); box-shadow: 0 18px 50px rgba(0, 0, 0, 0.45); }
+.home-hero-shot img, .season img { display: block; width: 100%; height: auto; }
+.feature-strip { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 12px; margin: 28px 0 8px; }
+.feature-strip div, .values div { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); padding: 14px 16px; display: flex; flex-direction: column; gap: 4px; }
+.feature-strip strong, .values strong { color: var(--text); }
+.feature-strip span, .values span { color: var(--text-muted); font-size: 0.92rem; }
+.mode-grid, .program-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(230px, 1fr)); gap: 16px; }
+.mode, .program { background: var(--surface); border: 1px solid var(--border); border-top: 4px solid var(--buzz-yellow); border-radius: var(--radius); padding: 18px; display: flex; flex-direction: column; gap: 8px; }
+.mode h3, .program h3 { margin: 0; font-size: 1.15rem; }
+.mode p, .program p { margin: 0; color: var(--text-muted); font-size: 0.95rem; }
+.mode p { flex: 1; }
+.mode button { align-self: flex-start; margin-top: 6px; }
+.mode-play { border-top-color: var(--first-red); }
+.mode-code { border-top-color: var(--first-blue); }
+.mode-cad { border-top-color: var(--ftc-orange); }
+.mode-rank { border-top-color: var(--buzz-yellow); }
+.program-fll { border-top-color: var(--first-red); }
+.program-ftc { border-top-color: var(--ftc-orange); }
+.program-frc { border-top-color: var(--first-blue); }
+.program .ages { color: var(--buzz-yellow); font-weight: 700; font-size: 0.85rem; }
+.season { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 28px; align-items: center; margin: 44px 0; }
+.season h2 { margin-top: 0; }
+.season p { color: var(--text-muted); }
+.first-cta { display: flex; align-items: center; justify-content: space-between; gap: 20px; flex-wrap: wrap; margin: 40px 0 24px; padding: 22px 24px; border-radius: 14px; background: linear-gradient(120deg, rgba(0, 102, 179, 0.22), rgba(237, 28, 36, 0.18)); border: 1px solid var(--border); }
+.first-cta h2 { margin: 0 0 6px; font-size: 1.35rem; }
+.first-cta p { margin: 0; color: var(--text-muted); max-width: 640px; }
+.first-page .lead { font-size: 1.1rem; color: var(--text-muted); max-width: 820px; }
+.first-page h1 { font-size: clamp(2rem, 5vw, 3rem); font-weight: 900; margin: 12px 0 8px; }
+.values { display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 12px; }
+.link-list { padding-left: 20px; line-height: 1.9; }
+.link-list a, .first-page p a, .first-page .hint a { color: var(--buzz-yellow); }
+@media (max-width: 820px) {
+  .home-hero, .season { grid-template-columns: 1fr; }
+  .feature-strip { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
