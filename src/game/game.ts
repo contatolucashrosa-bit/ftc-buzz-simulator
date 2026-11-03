@@ -14,6 +14,10 @@ import { Flower } from "../sim/flower";
 import { Robot, robotConfigFromPreset } from "../sim/robot";
 import { Environment } from "../render/environment";
 import { ReplayPlayer, ReplayRecorder } from "./replay";
+import { HardwareBus } from "../java/hardwareBus";
+import { GamepadSource } from "../java/gamepadSource";
+import { runProgram } from "../java/javaRuntime";
+import type { HardwareUse } from "../java/project";
 import { getRobot } from "../workshop/robotStore";
 import { loadStoredModel } from "../workshop/cadImport";
 import type { RobotPreset } from "../config/robotPresets";
@@ -35,6 +39,27 @@ function withCadSize(preset: RobotPreset, cad?: CadRobot): RobotPreset {
   return { ...preset, length: clamp(cad.sizeIn.length), width: clamp(cad.sizeIn.width), height: Math.min(18, Math.max(8, cad.sizeIn.height)) };
 }
 
+/** OpMode já compilado para a partida. */
+export interface JavaOpModeRun {
+  label: string;
+  js: string;
+}
+
+export interface JavaSetup {
+  auto?: JavaOpModeRun;
+  teleop?: JavaOpModeRun;
+  deviceMap: Record<string, string>;
+  hardware: HardwareUse[];
+}
+
+export interface JavaView {
+  role: "auto" | "teleop";
+  label: string;
+  state: "INIT" | "RODANDO" | "PARADO";
+  telemetry: string;
+  error: string | null;
+}
+
 export interface GameOptions {
   mode: GameMode;
   quality: Quality;
@@ -47,6 +72,8 @@ export interface GameOptions {
   robotPreset: RobotPresetId;
   /** Robô importado na Oficina; o modelo 3D e as medidas vêm do CAD. */
   robotModelId?: string;
+  /** Código Java da equipe (AUTO e/ou TELEOP). */
+  java?: JavaSetup;
 }
 
 export interface FoulEntry {
@@ -84,6 +111,8 @@ export interface GameView {
   teamNumber: string;
   eventName: string;
   matchLabel: string;
+  /** OpMode Java em execução (telemetria para o HUD). */
+  java: JavaView | null;
   /** Replay em andamento (o jogo fica parado enquanto isso). */
   replay: { time: number; length: number; playing: boolean; speed: number } | null;
 }
@@ -150,6 +179,12 @@ export class Game {
   private readonly recorder = new ReplayRecorder();
   private replay: ReplayPlayer | null = null;
   private lastScores = { red: 0, blue: 0 };
+  // Código Java: um HardwareBus por OpMode em execução
+  private javaBus: HardwareBus | null = null;
+  private javaRole: "auto" | "teleop" | null = null;
+  private readonly retiring: Array<{ bus: HardwareBus; until: number }> = [];
+  private gamepads: GamepadSource | null = null;
+  private lastPose = { x: 0, y: 0, h: 0, vx: 0, vy: 0, vh: 0 };
 
   static async create(container: HTMLElement, options: GameOptions, callbacks: GameCallbacks): Promise<Game> {
     await initPhysics();
@@ -454,13 +489,104 @@ export class Game {
     }
   };
 
+  /** Fase do código Java: qual OpMode deveria estar rodando agora e em que estado. */
+  private javaTarget(clock: ClockState): { role: "auto" | "teleop"; state: number } | null {
+    const j = this.options.java;
+    if (!j) return null;
+    if (this.options.mode === "practice") return j.teleop ? { role: "teleop", state: 1 } : null;
+    if (!this.started || clock.phase === "pre") return j.auto ? { role: "auto", state: 0 } : null;
+    if (clock.phase === "auto") return j.auto ? { role: "auto", state: 1 } : null;
+    if (clock.phase === "transition") return j.teleop ? { role: "teleop", state: 0 } : null;
+    if (clock.phase === "post") return null;
+    return j.teleop ? { role: "teleop", state: 1 } : null;
+  }
+
+  private updateJava(clock: ClockState, dt: number, enabled: boolean) {
+    // OpModes que saíram de cena recebem mais alguns passos para terminar o laço (STOP)
+    for (let i = this.retiring.length - 1; i >= 0; i--) {
+      const r = this.retiring[i];
+      r.bus.step(dt, false);
+      r.until -= dt;
+      if (r.bus.ended || r.until <= 0) this.retiring.splice(i, 1);
+    }
+    const target = this.javaTarget(clock);
+    if (this.javaBus && (!target || target.role !== this.javaRole)) {
+      this.javaBus.state = 2;
+      this.retiring.push({ bus: this.javaBus, until: 2 });
+      this.javaBus = null;
+      this.javaRole = null;
+    }
+    if (!target) return null;
+    if (!this.javaBus) {
+      const run = this.options.java![target.role]!;
+      this.javaBus = this.startOpMode(run);
+      this.javaRole = target.role;
+    }
+    const bus = this.javaBus;
+    if (target.state > bus.state) bus.state = target.state;
+    this.updatePose(dt);
+    const actions = bus.step(dt, enabled && bus.state === 1);
+    return bus.state === 1 && !bus.ended ? actions : null;
+  }
+
+  private startOpMode(run: JavaOpModeRun): HardwareBus {
+    const java = this.options.java!;
+    this.gamepads ??= new GamepadSource();
+    const gamepads = this.gamepads;
+    const bus = new HardwareBus(java.deviceMap, java.hardware, { pose: () => this.lastPose, gamepad: (i, f) => gamepads.read(i, f) }, (text) => {
+      if (text.startsWith("OPMODE_ERROR")) this.flash(`Erro no OpMode ${run.label}: ${text.replace("OPMODE_ERROR ", "").split("\n")[0]}`, 6);
+    });
+    bus.install();
+    runProgram(run.js).catch((error) => {
+      bus.ended = true;
+      bus.error = String(error);
+      this.flash(`O OpMode ${run.label} parou: ${String(error).slice(0, 120)}`, 6);
+    });
+    return bus;
+  }
+
+  /** Pose verdadeira para a odometria e a IMU do código (mm, rad), com velocidades por diferença. */
+  private updatePose(dt: number): void {
+    const p = this.robot.pose();
+    const x = p.x * 25.4;
+    const y = p.y * 25.4;
+    let dh = p.heading - this.lastPose.h;
+    dh = Math.atan2(Math.sin(dh), Math.cos(dh));
+    this.lastPose = { x, y, h: p.heading, vx: (x - this.lastPose.x) / dt, vy: (y - this.lastPose.y) / dt, vh: dh / dt };
+  }
+
+  private javaView(): JavaView | null {
+    const bus = this.javaBus;
+    const role = this.javaRole;
+    if (!bus || !role) return null;
+    return {
+      role,
+      label: this.options.java![role]!.label,
+      state: bus.ended || bus.state === 2 ? "PARADO" : bus.state === 1 ? "RODANDO" : "INIT",
+      telemetry: bus.telemetry,
+      error: bus.error,
+    };
+  }
+
   private fixedStep(dt: number, input: ControlState, launch: boolean, place: boolean, nectar: boolean): void {
     const before = this.clock();
     const matchRunning = this.started && before.phase !== "pre";
+    const enabled = before.robotsEnabled && matchRunning;
 
-    // Comandos do robô: programa no AUTO, piloto no TELEOP
+    // Código Java da equipe: INIT antes do START, START junto com a fase, STOP no fim da fase
+    const java = this.updateJava(before, dt, enabled);
+
+    // Comandos do robô: programa no AUTO, piloto no TELEOP (ou o OpMode Java, quando houver)
     let command = { forward: 0, strafe: 0, turn: 0 };
-    if (before.phase === "auto" && this.options.mode === "match") {
+    if (java) {
+      command = { forward: java.forward, strafe: java.strafe, turn: java.turn };
+      this.robot.intakeOn = java.intakeOn;
+      if (java.launch) this.robot.launchOne(this.elements, enabled);
+      if (java.place) this.robot.flowerAction(this.elements, enabled);
+      // o lançador do código só manda quando o volante está girando
+      if (java.launcherSpeed !== null && java.launcherSpeed > 0.5) this.robot.launcherSpeed = java.launcherSpeed;
+      if (java.launcherPitchDeg !== null) this.robot.launcherPitchDeg = java.launcherPitchDeg;
+    } else if (before.phase === "auto" && this.options.mode === "match") {
       command = this.auto.update(dt, {
         pose: () => this.robot.pose(),
         setAim: (speed, pitch) => {
@@ -727,6 +853,7 @@ export class Game {
       teamNumber: this.options.teamNumber,
       eventName: this.options.eventName,
       matchLabel: this.options.matchLabel,
+      java: this.javaView(),
       replay: this.replay ? { time: this.replay.time, length: this.replay.length, playing: this.replay.playing, speed: this.replay.speed } : null,
     };
   }
@@ -736,6 +863,8 @@ export class Game {
 
   dispose(): void {
     cancelAnimationFrame(this.raf);
+    if (this.javaBus) this.javaBus.state = 2;
+    this.gamepads?.dispose();
     this.controls.dispose();
     this.elements.dispose();
     this.stage.dispose();

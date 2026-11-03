@@ -295,3 +295,24 @@ h1, h2, h3 { line-height: 1.2; margin: 0 0 0.5em; }
   .rh-center { grid-column: 1 / -1; grid-row: 1; }
   .replay-speed, .replay-time { display: none; }
 }
+
+/* M5: código Java (Oficina e telemetria) */
+.java-section { margin: 28px 0; }
+.java-section .actions { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; margin: 12px 0; }
+.java-section label.btn { cursor: pointer; }
+.java-list { display: grid; gap: 14px; }
+.java-card h4 { margin: 12px 0 6px; font-size: 0.85rem; text-transform: uppercase; letter-spacing: 0.05em; color: var(--text-muted); }
+.java-ops { list-style: none; padding: 0; margin: 0; display: grid; gap: 8px; }
+.java-ops li { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
+.java-ops small { color: var(--text-muted); }
+.java-result { flex-basis: 100%; font-size: 0.85rem; }
+.java-result.ok { color: #6cc24a; }
+.java-result.error { color: #ff9a9e; }
+.java-result ul { margin: 4px 0 0; padding-left: 18px; }
+.java-map select { width: 100%; background: var(--surface); color: var(--text); border: 1px solid var(--border); border-radius: 6px; padding: 4px; font: inherit; }
+.java-map td, .java-map th { text-align: left !important; }
+.java-errors { white-space: pre-wrap; font-size: 0.85rem; max-height: 50vh; overflow: auto; }
+.telemetry { max-width: 340px; }
+.telemetry pre { margin: 0; white-space: pre-wrap; font-size: 0.8rem; max-height: 30vh; overflow: auto; font-family: ui-monospace, Consolas, monospace; }
+.telemetry.error pre { color: #ff9a9e; }
+.telemetry .hint { margin: 6px 0 0; font-size: 0.72rem; color: var(--text-muted); }

@@ -208,6 +208,11 @@ export async function mountGameScreen(root: HTMLElement, options: GameOptions, a
           </div>
         </div>
         <div class="panel fouls" data-fouls hidden></div>
+        <div class="panel telemetry" data-telemetry hidden>
+          <h4 data-telemetry-title>Telemetria</h4>
+          <pre data-telemetry-text></pre>
+          ${options.java?.teleop ? `<p class="hint">Gamepad 1 no teclado: W A S D (analógico esquerdo), Q/E (direito), setas (direcional), Espaço/F (gatilhos), H/G (bumpers), I J K L (Y X A B).</p>` : ""}
+        </div>
       </div>
       <div class="panel help" data-help ${isTouch ? "hidden" : ""}>
         <h4>Controles</h4>
@@ -464,6 +469,14 @@ export async function mountGameScreen(root: HTMLElement, options: GameOptions, a
     q("[data-drive]").textContent = view.relativeDrive ? "relativa à câmera" : "relativa ao robô";
     q("[data-fps]").textContent = String(view.fps);
 
+    const telemetryEl = q("[data-telemetry]");
+    telemetryEl.hidden = !view.java;
+    if (view.java) {
+      const j = view.java;
+      q("[data-telemetry-title]").textContent = `${j.role === "auto" ? "AUTO" : "TELEOP"} · ${j.label} · ${j.state}`;
+      q("[data-telemetry-text]").textContent = j.error ? `Erro: ${j.error}` : j.telemetry.trim() || "(sem telemetria)";
+      telemetryEl.classList.toggle("error", !!j.error);
+    }
     const foulsEl = q("[data-fouls]");
     foulsEl.hidden = view.fouls.length === 0;
     foulsEl.innerHTML = `<h4>Faltas</h4>${view.fouls.slice(-3).map((f) => `<div>${f.clock} ${f.rule} — ${escapeHtml(f.text)}</div>`).join("")}`;
