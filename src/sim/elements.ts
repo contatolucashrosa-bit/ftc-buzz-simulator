@@ -13,7 +13,8 @@ export interface GameElement {
   kind: ElementKind;
   radius: number; // pol
   body: RAPIER.RigidBody;
-  mesh: THREE.Mesh;
+  /** Pose visual (não fica na cena: o desenho é feito por instancing, uma chamada por tipo). */
+  mesh: THREE.Object3D;
   /** Aliança do último robô que lançou/colocou este elemento (para G410). */
   lastLaunchedBy: Alliance | null;
   /** Já gerou falta G410 nesta partida. */
@@ -80,8 +81,22 @@ function perforationTexture(holeAngle: number): THREE.CanvasTexture | null {
   return texture;
 }
 
+export interface Impact {
+  kind: ElementKind;
+  /** 0..1, pela variação de velocidade. */
+  strength: number;
+  x: number;
+}
+
+/** Capacidade de cada malha instanciada (40 POLLEN + folga; 8 NECTAR por aliança + folga). */
+const INSTANCE_CAPACITY: Record<ElementKind, number> = { pollen: 64, redNectar: 24, blueNectar: 24 };
+const IMPACT_MIN_DV = 0.9; // m/s
+
 export class ElementManager {
   readonly elements: GameElement[] = [];
+  private readonly instanced: Record<ElementKind, THREE.InstancedMesh>;
+  private readonly lastVelocity = new Map<number, THREE.Vector3>();
+  private readonly pendingImpacts: Impact[] = [];
   private nextId = 1;
   private readonly geometries: Record<"pollen" | "nectar", THREE.SphereGeometry>;
   private readonly materials: Record<ElementKind, THREE.MeshStandardMaterial>;
@@ -102,6 +117,19 @@ export class ElementManager {
       redNectar: new THREE.MeshStandardMaterial({ color: ELEMENT_COLORS.redNectar, map: nectarHoles, roughness: 0.5 }),
       blueNectar: new THREE.MeshStandardMaterial({ color: ELEMENT_COLORS.blueNectar, map: nectarHoles, roughness: 0.5 }),
     };
+    // Uma malha instanciada por tipo: 56+ bolas viram 3 chamadas de desenho
+    const make = (kind: ElementKind) => {
+      const mesh = new THREE.InstancedMesh(this.geometries[kind === "pollen" ? "pollen" : "nectar"], this.materials[kind], INSTANCE_CAPACITY[kind]);
+      mesh.count = 0;
+      mesh.castShadow = true;
+      mesh.receiveShadow = true;
+      // a caixa envolvente da malha base não representa as instâncias espalhadas pelo campo
+      mesh.frustumCulled = false;
+      mesh.instanceMatrix.setUsage(THREE.DynamicDrawUsage);
+      this.scene.add(mesh);
+      return mesh;
+    };
+    this.instanced = { pollen: make("pollen"), redNectar: make("redNectar"), blueNectar: make("blueNectar") };
   }
 
   /** Cria um elemento na posição do manual (pol), com velocidade inicial opcional (m/s, mundo). */
@@ -126,9 +154,7 @@ export class ElementManager {
     );
     if (velocity) body.setLinvel(velocity, true);
 
-    const mesh = new THREE.Mesh(this.geometries[kind === "pollen" ? "pollen" : "nectar"], this.materials[kind]);
-    mesh.castShadow = true;
-    this.scene.add(mesh);
+    const mesh = new THREE.Object3D();
 
     const element: GameElement = {
       id: this.nextId++,
@@ -150,7 +176,7 @@ export class ElementManager {
     if (i >= 0) this.elements.splice(i, 1);
     const removedAt = element.body.translation();
     this.physics.world.removeRigidBody(element.body);
-    this.scene.remove(element.mesh);
+    this.lastVelocity.delete(element.id);
     // O Rapier "adormece" corpos parados e remover um vizinho não os acorda: sem isso, os POLLEN
     // de cima ficariam flutuando na FLOWER quando o de baixo é retirado pelo intake.
     const wakeRadius = 0.6; // m, cobre uma pilha inteira de FLOWER
@@ -167,7 +193,39 @@ export class ElementManager {
   }
 
   sync(): void {
-    for (const e of this.elements) this.syncOne(e);
+    const counts: Record<ElementKind, number> = { pollen: 0, redNectar: 0, blueNectar: 0 };
+    for (const e of this.elements) {
+      this.syncOne(e);
+      this.detectImpact(e);
+      const mesh = this.instanced[e.kind];
+      const i = counts[e.kind]++;
+      if (i >= INSTANCE_CAPACITY[e.kind]) continue;
+      e.mesh.updateMatrix();
+      mesh.setMatrixAt(i, e.mesh.matrix);
+    }
+    for (const kind of Object.keys(counts) as ElementKind[]) {
+      const mesh = this.instanced[kind];
+      mesh.count = Math.min(counts[kind], INSTANCE_CAPACITY[kind]);
+      mesh.instanceMatrix.needsUpdate = true;
+    }
+  }
+
+  /** Mudança brusca de velocidade desde o último quadro = batida (para os sons). */
+  private detectImpact(e: GameElement): void {
+    const v = e.body.linvel();
+    const last = this.lastVelocity.get(e.id);
+    if (!last) {
+      this.lastVelocity.set(e.id, new THREE.Vector3(v.x, v.y, v.z));
+      return;
+    }
+    const dv = Math.hypot(v.x - last.x, v.y - last.y, v.z - last.z);
+    last.set(v.x, v.y, v.z);
+    if (dv > IMPACT_MIN_DV) this.pendingImpacts.push({ kind: e.kind, strength: Math.min(1, dv / 4), x: e.mesh.position.x });
+  }
+
+  /** Batidas desde a última chamada. */
+  takeImpacts(): Impact[] {
+    return this.pendingImpacts.splice(0, this.pendingImpacts.length);
   }
 
   /** Malha avulsa (mesma geometria e material), usada pelo replay. */
@@ -176,7 +234,7 @@ export class ElementManager {
   }
 
   setVisible(visible: boolean): void {
-    for (const e of this.elements) e.mesh.visible = visible;
+    for (const mesh of Object.values(this.instanced)) mesh.visible = visible;
   }
 
   private syncOne(e: GameElement): void {
@@ -188,6 +246,10 @@ export class ElementManager {
 
   dispose(): void {
     for (const e of [...this.elements]) this.remove(e);
+    for (const mesh of Object.values(this.instanced)) {
+      this.scene.remove(mesh);
+      mesh.dispose();
+    }
     Object.values(this.geometries).forEach((g) => g.dispose());
     Object.values(this.materials).forEach((m) => m.dispose());
   }
