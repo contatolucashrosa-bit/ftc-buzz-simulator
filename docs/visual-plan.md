@@ -41,4 +41,5 @@
 ## Situação (02/11/2026)
 - **Marco 2:** POLLEN e NECTAR perfurados (textura procedural com os 26 furos). Faltam instancing e sons.
 - **Marco 3:** HUMAN PLAYERS apicultores (vermelho e azul) com animação de entrega do NECTAR. Falta a máquina de estados completa (pegar, levar, voltar).
+- **Marco 5:** placar com números animados e "+N", ícones de RP com animação ao conquistar, tela de resultado (recorde e posição no ranking), ranking de qualificação local com troca por arquivo (`src/match/history.ts`) e replay dos últimos 30 s (`src/game/replay.ts`).
 - **Marco 4:** céu, gramado, floresta, cogumelos, flores, arquibancada com plateia (animada no Alto) e banners da WestSharks, tudo em `src/render/environment.ts`, com quantidades por preset. Medido no navegador: cerca de 57 FPS nos três presets (limite da taxa de atualização da tela).

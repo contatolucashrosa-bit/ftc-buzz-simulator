@@ -47,6 +47,9 @@ Já disponível (marcos M0–M3):
 - **Faltas automáticas**: G410 (NECTAR na FLOWER antes de 1:00), com MAJOR FOUL creditado à adversária.
 - **HUMAN PLAYER**: introduz NECTAR pela LOADING ZONE, 1 por TIP ou todos com 1:00 restante (G426).
 - **Score Overlay** recriado nativamente: barra do evento, alianças, ícones de RP, números das equipes e cronômetro.
+- **Placar animado e resultados**: números que sobem contando com "+N", ícones de RP que acendem ao serem conquistados, tela de resultado com recorde da equipe e posição no ranking.
+- **Replay** dos últimos 30 s (pausa ou fim da partida), com velocidades de 0,25× a 2× e barra de posição.
+- **Placares**: ranking de qualificação local (média de RP, média de pontos e recorde), histórico de partidas e ranking da turma por arquivo JSON (exportar e importar).
 - **Autônomos de exemplo**: LEAVE, LEAVE + PARK, ou lançar na HIVE e estacionar.
 - **Controles**: teclado, gamepad e toque; câmeras de plateia, piloto, robô, de cima e livre.
 - **Qualidade ajustável** para computadores escolares modestos.

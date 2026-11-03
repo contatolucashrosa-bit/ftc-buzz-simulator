@@ -47,6 +47,9 @@ Available now (milestones M0–M3):
 - **Automatic fouls**: G410 (NECTAR in a FLOWER before 1:00), with a MAJOR FOUL credited to the opponent.
 - **HUMAN PLAYER**: enters NECTAR through the LOADING ZONE, 1 per TIP or all of it with 1:00 left (G426).
 - **Natively recreated Score Overlay**: event bar, alliances, RP icons, team numbers and timer.
+- **Animated scoreboard and results**: count-up numbers with "+N", RP icons that light up when earned, a results screen with the team record and ranking position.
+- **Replay** of the last 30 s (pause menu or end of match), with 0.25× to 2× speeds and a position slider.
+- **Leaderboards**: local qualification ranking (average RP, average points and high score), match history and a class ranking by JSON file (export and import).
 - **Sample autonomous routines**: LEAVE, LEAVE + PARK, or launching into the HIVE and parking.
 - **Controls**: keyboard, gamepad and touch; audience, driver, robot, top-down and free cameras.
 - **Adjustable quality** for modest school computers.
