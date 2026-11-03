@@ -202,7 +202,9 @@ export class App {
         </fieldset>
         <fieldset class="field choices">
           <legend>Robôs na partida</legend>
-          <label class="choice"><input type="checkbox" id="bot-partner" ${p.botPartner ? "checked" : ""}><span>Parceiro (bot) na aliança vermelha<small>Coleta POLLEN, lança na sua HIVE e estaciona no fim.</small></span></label>
+          <label class="choice"><input type="radio" name="partner" value="bot" ${p.botPartner && !p.partnerPlayer ? "checked" : ""}><span>Parceiro bot na aliança vermelha<small>Coleta POLLEN, lança na sua HIVE e estaciona no fim.</small></span></label>
+          <label class="choice"><input type="radio" name="partner" value="player" ${p.partnerPlayer ? "checked" : ""}><span>2º jogador no mesmo computador<small>Teclado: I/K anda, J/L gira, H coleta, Y lança (mira automática), U usa a FLOWER. Ou o 2º controle conectado. No AUTO, o parceiro roda o programa do bot.</small></span></label>
+          <label class="choice"><input type="radio" name="partner" value="none" ${!p.botPartner && !p.partnerPlayer ? "checked" : ""}><span>Sem parceiro</span></label>
           <div class="field-row">
             <label for="bot-opponents">Adversários azuis</label>
             <select id="bot-opponents">${[0, 1, 2].map((n) => `<option value="${n}" ${p.botOpponents === n ? "selected" : ""}>${n === 0 ? "nenhum" : `${n} bot${n > 1 ? "s" : ""}`}</option>`).join("")}</select>
@@ -249,7 +251,8 @@ export class App {
         eventName: form.querySelector<HTMLInputElement>("#event")!.value.trim() || "Treino da equipe",
         ...readAutoChoice(form.querySelector<HTMLInputElement>('input[name="auto"]:checked')?.value, this.prefs.autoProgram),
         javaTeleop: form.querySelector<HTMLInputElement>('input[name="teleop"]:checked')?.value ?? "",
-        botPartner: form.querySelector<HTMLInputElement>("#bot-partner")!.checked,
+        botPartner: form.querySelector<HTMLInputElement>('input[name="partner"]:checked')?.value === "bot",
+        partnerPlayer: form.querySelector<HTMLInputElement>('input[name="partner"]:checked')?.value === "player",
         botOpponents: Number(form.querySelector<HTMLSelectElement>("#bot-opponents")!.value) as 0 | 1 | 2,
         botLevel: form.querySelector<HTMLSelectElement>("#bot-level")!.value as BotLevel,
         quality: form.querySelector<HTMLSelectElement>("#quality")!.value as Quality,
@@ -355,7 +358,7 @@ export class App {
       launchIntervalS: clampInterval(this.prefs.launchIntervalS),
       robotPreset: this.prefs.robotPreset,
       robotModelId: this.prefs.robotModelId || undefined,
-      bots: { partner: this.prefs.botPartner, opponents: this.prefs.botOpponents, level: this.prefs.botLevel },
+      bots: { partner: this.prefs.botPartner, partnerPlayer: this.prefs.partnerPlayer, opponents: this.prefs.botOpponents, level: this.prefs.botLevel },
     };
     history.replaceState(null, "", "#play");
     this.root.innerHTML = "";

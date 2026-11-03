@@ -295,7 +295,7 @@ export async function mountGameScreen(root: HTMLElement, options: GameOptions, a
       `<h2>${escapeHtml(options.matchLabel)}</h2>
        <p>O robô <strong>${escapeHtml(options.teamNumber)}</strong> está na posição de largada, com 4 POLLEN pré-carregados (G304).
        O AUTO dura 30 s e roda o programa escolhido; depois de 8 s de transição, você assume no TELEOP (2:00).</p>
-       ${options.bots && (options.bots.partner || options.bots.opponents) ? `<p class="notice">Na arena: ${[options.bots.partner && "1 parceiro", options.bots.opponents && `${options.bots.opponents} adversário(s)`].filter(Boolean).join(" e ")} controlados pelo simulador.</p>` : `<p class="notice">Treino solo: sem robôs-bot (ative na tela "Jogar").</p>`}
+       ${options.bots && (options.bots.partner || options.bots.partnerPlayer || options.bots.opponents) ? `<p class="notice">Na arena: ${[options.bots.partnerPlayer && "parceiro pilotado pelo 2º jogador (I/J/K/L, H, Y, U ou 2º controle)", options.bots.partner && !options.bots.partnerPlayer && "1 parceiro bot", options.bots.opponents && `${options.bots.opponents} adversário${options.bots.opponents > 1 ? "s" : ""} bot`].filter(Boolean).join(" e ")}.</p>` : `<p class="notice">Treino solo: sem robôs-bot (ative na tela "Jogar").</p>`}
        <div class="actions"><button class="btn btn-primary" data-m="go">Iniciar partida</button>
        <button class="btn btn-secondary" data-m="exit">Voltar</button></div>`,
       (el) => {

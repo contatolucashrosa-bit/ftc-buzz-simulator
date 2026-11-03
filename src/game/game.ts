@@ -16,6 +16,7 @@ import { Environment } from "../render/environment";
 import { SoundBoard } from "../render/audio";
 import { ReplayPlayer, ReplayRecorder } from "./replay";
 import { FoulMonitor, type FoulRobot } from "./fouls";
+import type { SecondPlayerState } from "../input/controls";
 import { BotBrain, type BotLevel, type BotWorld } from "./bot";
 import { ROBOT_PRESETS, type RobotPresetId as BotPresetId } from "../config/robotPresets";
 import { HardwareBus } from "../java/hardwareBus";
@@ -27,7 +28,7 @@ import { loadStoredModel } from "../workshop/cadImport";
 import type { RobotPreset } from "../config/robotPresets";
 import { robotPreset, type RobotPresetId } from "../config/robotPresets";
 import { ELEMENTS, FIELD, FLOWERS, GARDENS, HIVE, LOADING_ZONES, circleTouchesRect, toWorld, INCH } from "../sim/geometry";
-import { AutoRunner, buildAutoSteps, RED_START, type AutoProgramId } from "./autonomous";
+import { AutoRunner, buildAutoSteps, hiveShot, RED_START, type AutoProgramId } from "./autonomous";
 
 export type GameMode = "practice" | "match";
 
@@ -67,6 +68,8 @@ export interface JavaView {
 export interface BotOptions {
   /** Parceiro na aliança vermelha. */
   partner: boolean;
+  /** O parceiro é pilotado por um 2º jogador local (o bot só faz o AUTO dele). */
+  partnerPlayer?: boolean;
   /** Robôs na aliança azul (0 a 2). */
   opponents: 0 | 1 | 2;
   level: BotLevel;
@@ -78,6 +81,8 @@ interface BotRobot {
   alliance: Alliance;
   slot: 0 | 1;
   label: string;
+  /** Pilotado pelo 2º jogador no TELEOP. */
+  human: boolean;
 }
 
 /** Largada dos bots (G304: tocando a parede da própria aliança, fora da LOADING ZONE). */
@@ -185,6 +190,7 @@ export class Game {
   private readonly robot: Robot;
   private readonly bots: BotRobot[] = [];
   private botNectarTimer = 0;
+  private secondInput: SecondPlayerState | null = null;
   private readonly environment: Environment;
   private readonly controls = new Controls();
   private readonly auto: AutoRunner;
@@ -297,6 +303,7 @@ export class Game {
       skipTo: (elapsedSeconds: number) => (this.elapsed = elapsedSeconds),
       /** Roda `seconds` de simulação de uma vez, sem esperar os quadros (testes com a aba em segundo plano). */
       advance: (seconds: number) => {
+        if (this.bots.some((b) => b.human)) this.secondInput = this.controls.pollSecond();
         const input = this.controls.poll();
         const steps = Math.round(seconds / this.physics.dt);
         for (let i = 0; i < steps && !this.finished; i++) this.fixedStep(this.physics.dt, input, false, false, false);
@@ -452,18 +459,19 @@ export class Game {
   private createBots(options?: BotOptions): void {
     if (!options) return;
     const wanted: Array<[Alliance, 0 | 1]> = [];
-    if (options.partner) wanted.push(["red", 1]);
+    if (options.partner || options.partnerPlayer) wanted.push(["red", 1]);
     for (let i = 0; i < options.opponents; i++) wanted.push(["blue", i as 0 | 1]);
     wanted.forEach(([alliance, slot], i) => {
       const preset = ROBOT_PRESETS[BOT_PRESETS[i % BOT_PRESETS.length]];
-      const label = `BOT ${i + 1}`;
+      const human = !!options.partnerPlayer && alliance === "red";
+      const label = human ? "JOGADOR 2" : `BOT ${i + 1}`;
       const robot = new Robot(
         { ...robotConfigFromPreset(preset), alliance, teamNumber: label, start: BOT_STARTS[alliance][slot] },
         this.physics,
         this.stage.scene,
       );
       robot.onLaunch = () => this.sound.launch(this.pan(robot.group.position.x));
-      this.bots.push({ robot, brain: new BotBrain(alliance, options.level), alliance, slot, label });
+      this.bots.push({ robot, brain: new BotBrain(alliance, options.level), alliance, slot, label, human });
     });
   }
 
@@ -495,6 +503,10 @@ export class Game {
 
   private stepBots(dt: number, clock: ClockState, enabled: boolean): void {
     for (const bot of this.bots) {
+      if (bot.human && (clock.driverControl || this.options.mode === "practice")) {
+        this.stepSecondPlayer(bot, dt, enabled);
+        continue;
+      }
       const out = enabled ? bot.brain.update(dt, this.botWorld(bot, clock, enabled)) : { drive: { forward: 0, strafe: 0, turn: 0 }, intake: false };
       bot.robot.intakeOn = out.intake;
       bot.robot.drive(out.drive, dt, enabled);
@@ -509,6 +521,27 @@ export class Game {
         this.introduceNectar("blue", clock, true);
       }
     }
+  }
+
+  /** 2º jogador: comandos do teclado (IJKL) ou do 2º controle, com mira automática na CELL de cima. */
+  private stepSecondPlayer(bot: BotRobot, dt: number, enabled: boolean): void {
+    const input = this.secondInput;
+    const robot = bot.robot;
+    robot.intakeOn = !!input?.intakeHeld;
+    robot.drive(input ? { forward: input.forward, strafe: input.strafe, turn: input.turn } : { forward: 0, strafe: 0, turn: 0 }, dt, enabled);
+    if (input?.launch) {
+      // sem ajuste fino no teclado: o lançador mira pela distância até a HIVE, como um robô com visão
+      const upSide = this.hives[bot.alliance].logic.upSide;
+      const pose = robot.pose();
+      const shot = hiveShot(bot.alliance, upSide, robot.launchExitInfo, Math.max(30, upSide * pose.y));
+      robot.launcherSpeed = shot.aim.speed;
+      robot.launcherPitchDeg = shot.aim.pitchDeg;
+      robot.startBurst(enabled);
+    }
+    if (input?.place) robot.flowerAction(this.elements, enabled);
+    if (input) input.launch = input.place = false;
+    robot.updateBurst(this.elements, enabled);
+    robot.updateIntake(this.elements, enabled);
   }
 
   /** Robôs de cada aliança na ordem do placar (vermelho 1 = jogador). */
@@ -560,6 +593,12 @@ export class Game {
       this.fpsTime = 0;
     }
 
+    if (this.bots.some((b) => b.human)) {
+      // ações de toque único se acumulam até o próximo passo da física consumir
+      const second = this.controls.pollSecond();
+      const prev = this.secondInput;
+      this.secondInput = { ...second, launch: second.launch || !!prev?.launch, place: second.place || !!prev?.place };
+    }
     const input = this.controls.poll();
     this.lastControls = input;
     if (input.pause) this.callbacks.onPauseRequest();

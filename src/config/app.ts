@@ -35,6 +35,8 @@ export interface Preferences {
   javaTeleop: string;
   /** Robôs-bot: parceiro na aliança vermelha, adversários azuis (0–2) e nível. */
   botPartner: boolean;
+  /** O parceiro vermelho é um 2º jogador no mesmo computador (teclado IJKL ou 2º controle). */
+  partnerPlayer: boolean;
   botOpponents: 0 | 1 | 2;
   botLevel: "easy" | "medium" | "hard";
 }
@@ -50,7 +52,7 @@ export function defaultQuality(): Quality {
 }
 
 export function loadPrefs(): Preferences {
-  const fallback: Preferences = { teamNumber: "24823", quality: defaultQuality(), autoProgram: "leavePark", eventName: "Treino da equipe", launchIntervalS: DEFAULT_LAUNCH_INTERVAL_S, robotPreset: "generic", robotModelId: "", javaAuto: "", javaTeleop: "", botPartner: true, botOpponents: 2, botLevel: "medium" };
+  const fallback: Preferences = { teamNumber: "24823", quality: defaultQuality(), autoProgram: "leavePark", eventName: "Treino da equipe", launchIntervalS: DEFAULT_LAUNCH_INTERVAL_S, robotPreset: "generic", robotModelId: "", javaAuto: "", javaTeleop: "", botPartner: true, partnerPlayer: false, botOpponents: 2, botLevel: "medium" };
   try {
     const raw = localStorage.getItem(PREFS_KEY);
     return raw ? { ...fallback, ...(JSON.parse(raw) as Partial<Preferences>) } : fallback;

@@ -1,6 +1,16 @@
 // Buzz Simulator — Criado por Lucas Hochmann Rosa (https://github.com/contatolucashrosa-bit), em parceria com WestSharksFTC #24823.
 // Entrada unificada: teclado, gamepad (mapeamento "standard") e toque (tablet/Chromebook).
 
+/** 2º jogador local: pilota o parceiro vermelho em relação ao próprio robô (sem câmera própria). */
+export interface SecondPlayerState {
+  forward: number;
+  strafe: number;
+  turn: number;
+  intakeHeld: boolean;
+  launch: boolean;
+  place: boolean;
+}
+
 export interface ControlState {
   /** Movimento relativo à tela: x = direita, y = para frente. Entre -1 e 1. */
   moveX: number;
@@ -46,6 +56,7 @@ export class Controls {
   private readonly down = new Set<string>();
   private readonly pressed = new Set<string>();
   private prevPad: boolean[] = [];
+  private prevPad2: boolean[] = [];
   private touch = { moveX: 0, moveY: 0, turn: 0, intake: false, edges: new Set<EdgeAction>() };
   private readonly cleanup: Array<() => void> = [];
 
@@ -120,6 +131,40 @@ export class Controls {
         });
       }
     });
+  }
+
+  /**
+   * 2º jogador: teclado I/K (frente/ré), J/L (girar), H (coletar), Y (lançar), U (FLOWER), ou o 2º controle.
+   * Chamar antes de `poll()`, que limpa as teclas recém-apertadas.
+   */
+  pollSecond(): SecondPlayerState {
+    const key = (code: string) => this.down.has(code);
+    const state: SecondPlayerState = {
+      forward: (key("KeyI") ? 1 : 0) - (key("KeyK") ? 1 : 0),
+      strafe: 0,
+      turn: (key("KeyJ") ? 1 : 0) - (key("KeyL") ? 1 : 0),
+      intakeHeld: key("KeyH"),
+      launch: this.pressed.has("KeyY"),
+      place: this.pressed.has("KeyU"),
+    };
+    const pads = typeof navigator.getGamepads === "function" ? Array.from(navigator.getGamepads()).filter((p) => p && p.connected) : [];
+    const pad = pads[1];
+    if (pad) {
+      const b = (i: number) => !!pad.buttons[i]?.pressed;
+      const padEdge = (i: number) => b(i) && !this.prevPad2[i];
+      state.forward += -dz(pad.axes[1] ?? 0);
+      state.strafe += -dz(pad.axes[0] ?? 0);
+      state.turn += -dz(pad.axes[2] ?? 0);
+      state.intakeHeld ||= b(6) || b(4);
+      state.launch ||= padEdge(7);
+      state.place ||= padEdge(5);
+      this.prevPad2 = pad.buttons.map((x) => x.pressed);
+    }
+    const clamp = (v: number) => Math.max(-1, Math.min(1, v));
+    state.forward = clamp(state.forward);
+    state.strafe = clamp(state.strafe);
+    state.turn = clamp(state.turn);
+    return state;
   }
 
   /** Lê o estado do quadro atual. As ações "de toque único" valem só uma vez. */
