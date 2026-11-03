@@ -301,6 +301,7 @@ export class Game {
       place: () => this.robot.flowerAction(this.elements, true),
       give: (kind: "pollen" | "redNectar") => this.robot.hopper.push(kind),
       camera: (mode: "audience" | "driver" | "follow" | "top" | "free") => this.stage.setCamera(mode),
+      scene: () => this.stage.scene,
       /** Desenha um quadro agora (a aba em segundo plano não recebe requestAnimationFrame); devolve o tempo (ms). */
       render: () => {
         const t = performance.now();
