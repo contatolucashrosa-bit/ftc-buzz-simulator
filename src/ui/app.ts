@@ -9,6 +9,7 @@ import { ICON_BRAND } from "./icons";
 import { LAUNCH_INTERVAL_LIMITS, clampLaunchInterval as clampInterval } from "../config/robotDefaults";
 import { ROBOT_PRESETS, ROBOT_PRESET_IDS, robotPreset } from "../config/robotPresets";
 import { CAD_PREFIX, listRobots } from "../workshop/robotStore";
+import { bindRanking, rankingHtml } from "./ranking";
 
 type Route = "home" | "setup" | "workshop" | "leaderboard" | "teamRobots" | "about";
 
@@ -26,6 +27,28 @@ const QUALITY_LABELS: Record<Quality, string> = {
   medium: "Média — notebook comum",
   high: "Alta — sombras e mais detalhes",
 };
+
+/**
+ * Carrega um módulo sob demanda. Se o app foi atualizado com a aba aberta, os arquivos antigos (com outro
+ * hash no nome) somem e o import falha; nesse caso a página recarrega uma vez para pegar a versão nova.
+ */
+async function importFresh<T>(load: () => Promise<T>): Promise<T> {
+  const KEY = "buzz-simulator:reloaded-for-update";
+  try {
+    const mod = await load();
+    sessionStorage.removeItem(KEY);
+    return mod;
+  } catch (error) {
+    const stale = /dynamically imported module|Importing a module script failed|error loading dynamically imported module/i.test(String(error));
+    if (stale && !sessionStorage.getItem(KEY)) {
+      sessionStorage.setItem(KEY, "1");
+      location.reload();
+      // a página vai recarregar; não segue com o erro
+      return new Promise<T>(() => {});
+    }
+    throw error;
+  }
+}
 
 /** Robô escolhido na tela "Jogar": um modelo do simulador ou um CAD importado (com os mecanismos guardados). */
 function readRobotChoice(input: HTMLInputElement | null): Pick<Preferences, "robotPreset" | "robotModelId"> {
@@ -61,12 +84,7 @@ export class App {
       home: () => this.homeHtml(),
       setup: () => this.setupHtml(),
       workshop: () => `<div data-workshop><p class="lead">Carregando a Oficina…</p></div>`,
-      leaderboard: () =>
-        this.comingSoonHtml(
-          "Placares",
-          "Recordes por modo (AUTO, TELEOP e partida completa) guardados neste aparelho, com replays e exportação de arquivo para montar o ranking da turma. Nada é enviado para a internet.",
-          "M8",
-        ),
+      leaderboard: () => rankingHtml(),
       teamRobots: () =>
         this.comingSoonHtml(
           "Robôs da equipe",
@@ -79,6 +97,7 @@ export class App {
     this.bindNav();
     if (route === "setup") this.bindSetup();
     if (route === "workshop") this.mountWorkshop();
+    if (route === "leaderboard") bindRanking(this.root);
     this.root.querySelectorAll<HTMLElement>("[data-go]").forEach((el) =>
       el.addEventListener("click", () => this.go(el.dataset.go as Route)),
     );
@@ -133,7 +152,7 @@ export class App {
         <div class="card"><h3>Treino livre <span class="badge badge-ok">pronto</span></h3><p>Sem relógio: dirija, colete POLLEN, vire a HIVE e encha as FLOWERS no seu ritmo.</p><button class="btn btn-secondary btn-small" data-play="practice">Treinar</button></div>
         <div class="card"><h3>Partida completa <span class="badge badge-ok">pronto</span></h3><p>AUTO de 30 s, transição de 8 s e TELEOP de 2:00, com placar, RANKING POINTS e faltas automáticas.</p><button class="btn btn-secondary btn-small" data-go="setup">Configurar</button></div>
         <div class="card"><h3>Oficina <span class="badge badge-ok">CAD pronto</span></h3><p>Importe o CAD do seu robô (GLB, STL ou STEP) e jogue com ele. Código Java do Android Studio em seguida.</p><button class="btn btn-secondary btn-small" data-go="workshop">Abrir Oficina</button></div>
-        <div class="card"><h3>Placares <span class="badge">em construção</span></h3><p>Recordes locais por modo, replays e ranking da turma por arquivo.</p><button class="btn btn-secondary btn-small" data-go="leaderboard">Ver plano</button></div>
+        <div class="card"><h3>Placares <span class="badge badge-ok">pronto</span></h3><p>Ranking de qualificação deste aparelho, histórico de partidas e ranking da turma por arquivo.</p><button class="btn btn-secondary btn-small" data-go="leaderboard">Ver ranking</button></div>
       </section>
       <p class="notice">${DISCLAIMER}</p>`;
   }
@@ -242,7 +261,7 @@ export class App {
     const host = this.root.querySelector<HTMLElement>("[data-workshop]");
     if (!host) return;
     // Three.js só é carregado ao abrir a Oficina
-    const { mountWorkshop } = await import("./workshop");
+    const { mountWorkshop } = await importFresh(() => import("./workshop"));
     if (!host.isConnected) return;
     this.cleanup = await mountWorkshop(host);
   }
@@ -301,9 +320,9 @@ export class App {
     try {
       // Carregamento sob demanda: a página inicial abre rápido; Three.js e Rapier só vêm ao entrar na arena.
       this.root.innerHTML = `<main class="page"><p class="lead">Carregando a arena…</p></main>`;
-      const { mountGameScreen } = await import("./gameScreen");
+      const { mountGameScreen } = await importFresh(() => import("./gameScreen"));
       this.root.innerHTML = "";
-      this.cleanup = await mountGameScreen(this.root, options, { exitToHome: () => this.go("home"), restart });
+      this.cleanup = await mountGameScreen(this.root, options, { exitToHome: () => this.go("home"), openRanking: () => this.go("leaderboard"), restart });
     } catch (error) {
       console.error(error);
       this.root.innerHTML = `<main class="page"><h1>Não foi possível abrir a arena</h1>
