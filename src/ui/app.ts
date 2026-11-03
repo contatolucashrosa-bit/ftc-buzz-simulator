@@ -74,6 +74,18 @@ export class App {
   constructor(private readonly root: HTMLElement) {}
 
   start(): void {
+    // Só em desenvolvimento: ?autoplay&quality=high&cam=driver abre direto no treino (capturas de tela sem clique)
+    const query = new URLSearchParams(location.search);
+    if (import.meta.env.DEV && query.has("autoplay")) {
+      const quality = query.get("quality");
+      if (quality === "low" || quality === "medium" || quality === "high") this.prefs = { ...this.prefs, quality };
+      void this.play("practice").then(() => {
+        const cam = query.get("cam");
+        const debug = (window as unknown as { __buzz?: { camera(mode: string): void } }).__buzz;
+        if (cam && debug) debug.camera(cam);
+      });
+      return;
+    }
     const fromHash = location.hash.replace("#", "") as Route;
     this.go(NAV.some(([r]) => r === fromHash) ? fromHash : "home");
     window.addEventListener("hashchange", () => {

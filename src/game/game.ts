@@ -301,6 +301,12 @@ export class Game {
       place: () => this.robot.flowerAction(this.elements, true),
       give: (kind: "pollen" | "redNectar") => this.robot.hopper.push(kind),
       camera: (mode: "audience" | "driver" | "follow" | "top" | "free") => this.stage.setCamera(mode),
+      /** Desenha um quadro agora (a aba em segundo plano não recebe requestAnimationFrame); devolve o tempo (ms). */
+      render: () => {
+        const t = performance.now();
+        this.stage.render();
+        return performance.now() - t;
+      },
       skipTo: (elapsedSeconds: number) => (this.elapsed = elapsedSeconds),
       /** Roda `seconds` de simulação de uma vez, sem esperar os quadros (testes com a aba em segundo plano). */
       advance: (seconds: number) => {
