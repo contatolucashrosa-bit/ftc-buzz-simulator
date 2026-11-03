@@ -83,3 +83,42 @@ Total do app com Java e RoadRunner: cerca de 8 MB, dentro da meta de 15 MB. Depo
 1. `npm run dev`.
 2. Na primeira vez, prepare a pasta `tmp-spike/` com as amostras oficiais do FtcRobotController e o TeamCode do road-runner-quickstart, mais o `manifest.json`. Essa pasta não vai para o git.
 3. Abra `http://localhost:5173/m5a.html`. A página roda os quatro testes e imprime os tempos.
+
+## M5 — integração com a partida (02/11/2026)
+
+**Como usar:**
+1. **Oficina → Código Java (TeamCode):** importar a pasta do projeto do Android Studio (ou só a `TeamCode`), um `.zip`, ou "Carregar exemplos" (`examples/TeamCode`).
+2. **Conferir o mapa de hardware:** os nomes usados no `hardwareMap` são ligados aos dispositivos do robô simulado. A ligação é chutada pelo nome (`fl`, `frontLeft`, `left_front_drive`, `shooter`, `kicker`…) e pode ser corrigida na tabela. Um nome sem ligação aceita comandos e lê zero, então o OpMode não quebra por causa de um mecanismo que o simulador não tem.
+3. **Testar a compilação** de cada OpMode. Os erros aparecem em português, com arquivo e linha.
+4. **Tela "Jogar":** os OpModes `@Autonomous` aparecem no programa do AUTO, e os `@TeleOp`, no TELEOP.
+
+**Ciclo na partida, como no Driver Station:**
+
+| Momento | AUTO | TELEOP |
+|---|---|---|
+| Antes de "Iniciar partida" | INIT | — |
+| AUTO (30 s) | START → laço | — |
+| Transição (8 s) | STOP | INIT |
+| TELEOP (2:00) | — | START → laço |
+| Fim | — | STOP |
+
+No treino livre, o TeleOp começa direto.
+
+**Peças:**
+
+| Arquivo | Papel |
+|---|---|
+| `src/java/project.ts` | Lê o projeto: TeamCode, OpModes, `@Disabled`, bibliotecas pelos imports, hardware usado e o mapa de nomes (com testes) |
+| `src/java/compileWorker.ts` | javac + TeaVM num Web Worker (a página não trava) |
+| `src/java/javaRuntime.ts` | Cache no IndexedDB (SHA-256 do código), tradução dos erros, execução do programa |
+| `src/java/hardwareBus.ts` | `globalThis.__buzzHw` ligado ao `RobotHardware`: motores com encoder, servos, IMU e odometria pela pose real |
+| `src/java/gamepadSource.ts` | Gamepad físico (mapeamento padrão) ou teclado |
+
+**Gamepad 1 no teclado:**
+- W A S D: analógico esquerdo; Q/E: analógico direito;
+- setas: direcional; Espaço/F: gatilhos;
+- H/G: bumpers; I J K L: Y X A B.
+
+**Tempos medidos:** cerca de 3,5 s por OpMode no servidor de desenvolvimento e 1,9 s no build de produção. Da segunda vez, vem do cache e abre na hora. O laço Java gasta cerca de 1,4 ms por segundo de jogo.
+
+**Limitação nova:** dois arquivos `.java` com o mesmo nome em pacotes diferentes ainda não compilam juntos, porque o javac do navegador confere o nome do arquivo sem as pastas.
