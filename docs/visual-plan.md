@@ -39,7 +39,7 @@
 | 5 — Experiência | Números animados, ícones de RP, resultados detalhados, ranking de qualificação local, replay curto | Partida completa e replay |
 
 ## Situação (02/11/2026)
-- **Marco 2:** POLLEN e NECTAR perfurados (textura procedural com os 26 furos). Faltam instancing e sons.
-- **Marco 3:** HUMAN PLAYERS apicultores (vermelho e azul) com animação de entrega do NECTAR. Falta a máquina de estados completa (pegar, levar, voltar).
+- **Marco 2:** POLLEN e NECTAR perfurados (textura procedural com os 26 furos), desenhados com uma malha instanciada por tipo (3 chamadas de desenho para todas as bolas). Sons sintetizados com a Web Audio API (`src/render/audio.ts`): batidas das bolas (pelo salto de velocidade), lançamento, TIP com torcida, pontos e buzinas da partida. Tecla M liga e desliga.
+- **Marco 3:** HUMAN PLAYERS apicultores (vermelho e azul) com máquina de estados: ir até a caixa de NECTAR da ALLIANCE AREA, pegar, voltar à borda da LOADING ZONE e soltar. O NECTAR só entra no campo no instante em que é solto (G426/G427), e a caixa mostra quantos ainda estão fora do campo.
 - **Marco 5:** placar com números animados e "+N", ícones de RP com animação ao conquistar, tela de resultado (recorde e posição no ranking), ranking de qualificação local com troca por arquivo (`src/match/history.ts`) e replay dos últimos 30 s (`src/game/replay.ts`).
 - **Marco 4:** céu, gramado, floresta, cogumelos, flores, arquibancada com plateia (animada no Alto) e banners da WestSharks, tudo em `src/render/environment.ts`, com quantidades por preset. Medido no navegador: cerca de 57 FPS nos três presets (limite da taxa de atualização da tela).
