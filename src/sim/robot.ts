@@ -513,6 +513,10 @@ export class Robot {
     return kind;
   }
 
+  setTrajectoryVisible(visible: boolean): void {
+    this.trajectory.visible = visible;
+  }
+
   sync(showTrajectory = true): void {
     const t = this.body.translation();
     const r = this.body.rotation();

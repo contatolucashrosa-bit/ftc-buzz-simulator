@@ -195,8 +195,8 @@ export class Hive {
     return tipped;
   }
 
-  syncVisual(): void {
-    const q = quatAboutX(this.logic.angle);
+  syncVisual(angle = this.logic.angle): void {
+    const q = quatAboutX(angle);
     this.group.quaternion.set(q.x, q.y, q.z, q.w);
   }
 }

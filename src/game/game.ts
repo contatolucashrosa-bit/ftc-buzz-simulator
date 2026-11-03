@@ -6,13 +6,14 @@ import { clockAt, formatClock, matchDuration, nectarAllowance, type ClockState }
 import { computeScore, emptySnapshot, type MatchScore, type MatchSnapshot } from "../scoring/scoring";
 import { Controls, type ControlState } from "../input/controls";
 import { Stage, QUALITY_SETTINGS, CAMERA_LABELS, type Quality } from "../render/stage";
-import { RAPIER, createWorld, initPhysics, type PhysicsWorld } from "../sim/physics";
+import { RAPIER, createWorld, initPhysics, yawOf, type PhysicsWorld } from "../sim/physics";
 import { buildField, ALLIANCE_COLORS } from "../sim/field";
 import { ElementManager, allianceOfNectar, nectarOf } from "../sim/elements";
 import { Hive } from "../sim/hive";
 import { Flower } from "../sim/flower";
 import { Robot, robotConfigFromPreset } from "../sim/robot";
 import { Environment } from "../render/environment";
+import { ReplayPlayer, ReplayRecorder } from "./replay";
 import { getRobot } from "../workshop/robotStore";
 import { loadStoredModel } from "../workshop/cadImport";
 import type { RobotPreset } from "../config/robotPresets";
@@ -83,6 +84,8 @@ export interface GameView {
   teamNumber: string;
   eventName: string;
   matchLabel: string;
+  /** Replay em andamento (o jogo fica parado enquanto isso). */
+  replay: { time: number; length: number; playing: boolean; speed: number } | null;
 }
 
 export interface GameCallbacks {
@@ -144,6 +147,9 @@ export class Game {
   private readonly fouls: FoulEntry[] = [];
   private readonly messages: Array<{ text: string; until: number }> = [];
   private finalScore: MatchScore | null = null;
+  private readonly recorder = new ReplayRecorder();
+  private replay: ReplayPlayer | null = null;
+  private lastScores = { red: 0, blue: 0 };
 
   static async create(container: HTMLElement, options: GameOptions, callbacks: GameCallbacks): Promise<Game> {
     await initPhysics();
@@ -406,7 +412,7 @@ export class Game {
       this.flash(this.relativeDrive ? "Direção relativa à câmera" : "Direção relativa ao robô");
     }
 
-    if (!this.paused && !this.finished) {
+    if (!this.paused && !this.finished && !this.replay) {
       // ajustes do lançador (contínuos enquanto a tecla estiver pressionada)
       this.robot.launcherSpeed = Math.min(10, Math.max(2, this.robot.launcherSpeed + input.speedDelta * 2.5 * realDt));
       this.robot.launcherPitchDeg = Math.min(80, Math.max(10, this.robot.launcherPitchDeg + input.pitchDelta * 30 * realDt));
@@ -426,14 +432,20 @@ export class Game {
       if (steps === 8) this.accumulator = 0;
     }
 
-    this.elements.sync();
-    this.robot.sync(this.clock().driverControl || this.options.mode === "practice");
-    for (const hive of Object.values(this.hives)) hive.syncVisual();
+    if (this.replay) {
+      this.replay.update(realDt);
+    } else {
+      this.elements.sync();
+      this.robot.sync(this.clock().driverControl || this.options.mode === "practice");
+      for (const hive of Object.values(this.hives)) hive.syncVisual();
+      if (this.started && !this.paused && !this.finished) this.recordFrame(realDt);
+    }
     // na câmera do piloto, as pessoas da própria ALLIANCE AREA ficam coladas à câmera e tapavam metade do campo
     this.environment.alliances.red.visible = this.stage.mode !== "driver";
     this.environment.update(realDt, this.stage.camera.position);
-    const t = this.robot.body.translation();
-    this.stage.update({ position: new THREE.Vector3(t.x, t.y, t.z), heading: this.robot.pose().heading });
+    // a câmera do robô segue o modelo (no replay, a pose gravada)
+    const g = this.robot.group;
+    this.stage.update({ position: g.position.clone(), heading: yawOf(g.quaternion) });
     this.stage.render();
 
     if (now - this.lastViewAt > 100) {
@@ -632,9 +644,60 @@ export class Game {
     this.callbacks.onFinished(this.view());
   }
 
+  private recordFrame(dt: number): void {
+    this.recorder.capture(dt, {
+      clockText: this.options.mode === "practice" ? formatClock(Math.floor(this.elapsed)) : formatClock(this.clock().displaySeconds),
+      scores: this.lastScores,
+      robot: this.robot.group,
+      hiveAngles: { red: this.hives.red.logic.angle, blue: this.hives.blue.logic.angle },
+      elements: this.elements.elements,
+    });
+  }
+
+  /** Começa o replay dos últimos segundos gravados. Devolve false se ainda não há gravação. */
+  startReplay(): boolean {
+    const frames = this.recorder.clip();
+    if (frames.length < 2) return false;
+    this.replay?.dispose();
+    this.robot.setTrajectoryVisible(false);
+    this.replay = new ReplayPlayer(frames, {
+      scene: this.stage.scene,
+      robot: this.robot.group,
+      setHiveAngles: (a) => {
+        this.hives.red.syncVisual(a.red);
+        this.hives.blue.syncVisual(a.blue);
+      },
+      meshFor: (kind) => this.elements.meshFor(kind),
+      setLiveElementsVisible: (visible) => this.elements.setVisible(visible),
+    });
+    return true;
+  }
+
+  stopReplay(): void {
+    this.replay?.dispose();
+    this.replay = null;
+  }
+
+  replayControl(action: { toggle?: true; seek?: number; speed?: number; restart?: true }): void {
+    const r = this.replay;
+    if (!r) return;
+    if (action.restart) {
+      r.seek(0);
+      r.playing = true;
+    }
+    if (action.toggle) {
+      if (r.time >= r.length) r.seek(0);
+      r.playing = !r.playing;
+    }
+    if (action.seek !== undefined) r.seek(action.seek);
+    if (action.speed !== undefined) r.speed = action.speed;
+  }
+
   view(): GameView {
     const clock = this.clock();
     const score = this.finalScore ?? computeScore(this.snapshot());
+    this.lastScores = { red: score.red.total, blue: score.blue.total };
+    const replayFrame = this.replay?.frame;
     const now = performance.now();
     while (this.messages.length > 0 && this.messages[0].until < now) this.messages.shift();
     const practice = this.options.mode === "practice";
@@ -643,7 +706,7 @@ export class Game {
       started: this.started,
       paused: this.paused,
       clock,
-      clockText: practice ? formatClock(Math.floor(this.elapsed)) : formatClock(clock.displaySeconds),
+      clockText: replayFrame ? replayFrame.clockText : practice ? formatClock(Math.floor(this.elapsed)) : formatClock(clock.displaySeconds),
       phaseLabel: practice ? "Treino livre" : PHASE_LABELS[clock.phase],
       score,
       hopper: [...this.robot.hopper],
@@ -664,6 +727,7 @@ export class Game {
       teamNumber: this.options.teamNumber,
       eventName: this.options.eventName,
       matchLabel: this.options.matchLabel,
+      replay: this.replay ? { time: this.replay.time, length: this.replay.length, playing: this.replay.playing, speed: this.replay.speed } : null,
     };
   }
 

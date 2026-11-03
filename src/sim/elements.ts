@@ -170,6 +170,15 @@ export class ElementManager {
     for (const e of this.elements) this.syncOne(e);
   }
 
+  /** Malha avulsa (mesma geometria e material), usada pelo replay. */
+  meshFor(kind: ElementKind): THREE.Mesh {
+    return new THREE.Mesh(this.geometries[kind === "pollen" ? "pollen" : "nectar"], this.materials[kind]);
+  }
+
+  setVisible(visible: boolean): void {
+    for (const e of this.elements) e.mesh.visible = visible;
+  }
+
   private syncOne(e: GameElement): void {
     const t = e.body.translation();
     const r = e.body.rotation();
