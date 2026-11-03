@@ -97,6 +97,8 @@ export class Robot {
   private readonly placeExit: { forward: number; z: number };
   private servoArm: THREE.Group | null = null;
   private servoTime = 0;
+  /** Chamado a cada elemento lançado (sons, estatísticas). */
+  onLaunch: (() => void) | null = null;
   private servoCooldown = 0;
 
   constructor(
@@ -437,6 +439,7 @@ export class Robot {
     const e = elements.spawn(kind, p.x, p.y, p.z, this.launchVelocity());
     e.lastLaunchedBy = this.config.alliance;
     this.cooldown = this.config.launchIntervalS;
+    this.onLaunch?.();
     return kind;
   }
 

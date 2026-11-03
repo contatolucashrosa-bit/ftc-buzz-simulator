@@ -185,6 +185,7 @@ export async function mountGameScreen(root: HTMLElement, options: GameOptions, a
           </div>
           <p class="hint">Na câmera "Seguir robô": arraste para girar, use a roda para aproximar e dê dois cliques para voltar ao padrão. No controle: analógico direito (com R3 para girar).</p>
         </div>
+        <button class="icon-btn" data-act="sound" aria-pressed="false">Som (M)</button>
         <button class="icon-btn" data-act="help">Ajuda</button>
         <button class="icon-btn" data-act="touch">Toque</button>
       </div>
@@ -224,7 +225,7 @@ export async function mountGameScreen(root: HTMLElement, options: GameOptions, a
           ${flowerKey.help ? `<tr><td>G</td><td>${flowerKey.help}</td></tr>` : ""}
           <tr><td>↑ ↓ / ← →</td><td>velocidade / ângulo</td></tr>
           <tr><td>N</td><td>HUMAN PLAYER: NECTAR</td></tr>
-          <tr><td>C · O · R · V</td><td>câmera · direção · reiniciar · placar</td></tr>
+          <tr><td>C · O · R · V · M</td><td>câmera · direção · reiniciar · placar · som</td></tr>
           <tr><td>Mouse</td><td>câmera do robô: arrastar gira, roda aproxima</td></tr>
           <tr><td>Gamepad</td><td>analógicos, LT coleta, RT lança, ${flowerKey.button ? `RB ${flowerKey.button.toLowerCase()},` : ""} Y NECTAR; analógico direito ↕ inclina a câmera do robô, R3 + ↔ gira</td></tr>
         </table>
@@ -512,7 +513,15 @@ export async function mountGameScreen(root: HTMLElement, options: GameOptions, a
   });
   root.querySelector('[data-act="touch"]')!.addEventListener("click", () => q("[data-touch]").classList.toggle("show"));
 
+  const soundBtn = q<HTMLButtonElement>('[data-act="sound"]');
+  const showSound = (muted: boolean) => {
+    soundBtn.textContent = muted ? "Sem som (M)" : "Som (M)";
+    soundBtn.setAttribute("aria-pressed", String(muted));
+  };
+  showSound(game.sound.muted);
+  soundBtn.addEventListener("click", () => showSound(game!.toggleMute()));
   const onKey = (e: KeyboardEvent) => {
+    if (e.code === "KeyM" && game) showSound(game.toggleMute());
     if (e.code === "KeyR" && !modal.innerHTML) actions.restart(options);
   };
   window.addEventListener("keydown", onKey);

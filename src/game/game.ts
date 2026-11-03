@@ -13,6 +13,7 @@ import { Hive } from "../sim/hive";
 import { Flower } from "../sim/flower";
 import { Robot, robotConfigFromPreset } from "../sim/robot";
 import { Environment } from "../render/environment";
+import { SoundBoard } from "../render/audio";
 import { ReplayPlayer, ReplayRecorder } from "./replay";
 import { HardwareBus } from "../java/hardwareBus";
 import { GamepadSource } from "../java/gamepadSource";
@@ -179,6 +180,9 @@ export class Game {
   private readonly recorder = new ReplayRecorder();
   private replay: ReplayPlayer | null = null;
   private lastScores = { red: 0, blue: 0 };
+  readonly sound = new SoundBoard();
+  private lastPhase: ClockState["phase"] | null = null;
+  private lastFlowerUnlocked = false;
   // Código Java: um HardwareBus por OpMode em execução
   private javaBus: HardwareBus | null = null;
   private javaRole: "auto" | "teleop" | null = null;
@@ -220,6 +224,7 @@ export class Game {
       this.stage.scene,
       cad?.model,
     );
+    this.robot.onLaunch = () => this.sound.launch(this.pan(this.robot.group.position.x));
     this.auto = new AutoRunner(options.mode === "match" ? buildAutoSteps(options.autoProgram) : []);
     this.stageElements();
     if (options.mode === "practice") this.started = true;
@@ -471,6 +476,7 @@ export class Game {
       this.replay.update(realDt);
     } else {
       this.elements.sync();
+      for (const hit of this.elements.takeImpacts()) this.sound.impact(hit.kind === "pollen" ? "pollen" : "nectar", hit.strength, this.pan(hit.x));
       this.robot.sync(this.clock().driverControl || this.options.mode === "practice");
       for (const hive of Object.values(this.hives)) hive.syncVisual();
       if (this.started && !this.paused && !this.finished) this.recordFrame(realDt);
@@ -568,8 +574,31 @@ export class Game {
     };
   }
 
+  /** Posição horizontal na tela (-1 esquerda, 1 direita) para o som estéreo. */
+  private pan(worldX: number): number {
+    return (worldX - this.stage.camera.position.x) / 2.5;
+  }
+
+  /** Buzinas nas mudanças de fase da partida. */
+  private phaseSounds(clock: ClockState): void {
+    if (this.options.mode !== "match") return;
+    if (this.lastPhase !== null && clock.phase !== this.lastPhase) {
+      if (clock.phase === "auto") this.sound.buzzer("start");
+      else if (clock.phase === "transition" || clock.phase === "post") this.sound.buzzer("end");
+      else if (clock.phase === "teleop") this.sound.buzzer("teleop");
+    }
+    if (clock.flowerUnlocked && !this.lastFlowerUnlocked && this.started) this.sound.buzzer("endgame");
+    this.lastPhase = clock.phase;
+    this.lastFlowerUnlocked = clock.flowerUnlocked;
+  }
+
+  toggleMute(): boolean {
+    return this.sound.toggleMute();
+  }
+
   private fixedStep(dt: number, input: ControlState, launch: boolean, place: boolean, nectar: boolean): void {
     const before = this.clock();
+    this.phaseSounds(before);
     const matchRunning = this.started && before.phase !== "pre";
     const enabled = before.robotsEnabled && matchRunning;
 
@@ -621,6 +650,7 @@ export class Game {
         const isAuto = this.options.mode === "match" && (after.phase === "auto" || after.phase === "transition");
         this.tips[alliance][isAuto ? "auto" : "teleop"]++;
         this.flash(`HIVE ${alliance === "red" ? "vermelha" : "azul"} virou! +${RULES.points.teleopHiveTip} pontos e +1 NECTAR liberado`);
+        this.sound.tip();
       }
     }
 
@@ -822,6 +852,7 @@ export class Game {
   view(): GameView {
     const clock = this.clock();
     const score = this.finalScore ?? computeScore(this.snapshot());
+    if (this.started && !this.replay && score.red.total > this.lastScores.red) this.sound.score();
     this.lastScores = { red: score.red.total, blue: score.blue.total };
     const replayFrame = this.replay?.frame;
     const now = performance.now();
@@ -865,6 +896,7 @@ export class Game {
     cancelAnimationFrame(this.raf);
     if (this.javaBus) this.javaBus.state = 2;
     this.gamepads?.dispose();
+    this.sound.dispose();
     this.controls.dispose();
     this.elements.dispose();
     this.stage.dispose();
