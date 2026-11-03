@@ -316,3 +316,9 @@ h1, h2, h3 { line-height: 1.2; margin: 0 0 0.5em; }
 .telemetry pre { margin: 0; white-space: pre-wrap; font-size: 0.8rem; max-height: 30vh; overflow: auto; font-family: ui-monospace, Consolas, monospace; }
 .telemetry.error pre { color: #ff9a9e; }
 .telemetry .hint { margin: 6px 0 0; font-size: 0.72rem; color: var(--text-muted); }
+
+/* Robôs-bot na tela "Jogar" */
+.field-row { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 12px; margin: 6px 0; }
+.field-row label { font-weight: 700; }
+.field-row select { padding: 8px 10px; border-radius: 8px; border: 1px solid var(--border); background: var(--surface); color: var(--text); font: inherit; }
+.choice input[type="checkbox"] { margin-top: 4px; }

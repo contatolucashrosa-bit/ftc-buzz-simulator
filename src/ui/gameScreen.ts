@@ -164,9 +164,9 @@ export async function mountGameScreen(root: HTMLElement, options: GameOptions, a
       <div class="overlay" aria-live="off" data-overlay>
         <div class="ov-top"><span class="ov-event"></span><span class="ov-match"></span><span></span></div>
         <div class="ov-main">
-          <div class="ov-alliance blue"><div class="ov-bonus" data-bonus="blue"></div><div class="ov-teams"><span>—</span><span>—</span></div><div class="ov-score" data-score="blue">0</div></div>
+          <div class="ov-alliance blue"><div class="ov-bonus" data-bonus="blue"></div><div class="ov-teams" data-teams="blue"><span>—</span><span>—</span></div><div class="ov-score" data-score="blue">0</div></div>
           <div class="ov-center">${ICON_ROBOT}<div class="ov-timer-wrap"><div class="ov-timer">2:30</div><div class="ov-phase"></div></div></div>
-          <div class="ov-alliance red"><div class="ov-bonus" data-bonus="red"></div><div class="ov-teams"><span data-team></span><span>—</span></div><div class="ov-score" data-score="red">0</div></div>
+          <div class="ov-alliance red"><div class="ov-bonus" data-bonus="red"></div><div class="ov-teams" data-teams="red"><span data-team></span><span>—</span></div><div class="ov-score" data-score="red">0</div></div>
         </div>
       </div>
       <div class="toast-area" aria-live="polite"></div>
@@ -295,7 +295,7 @@ export async function mountGameScreen(root: HTMLElement, options: GameOptions, a
       `<h2>${escapeHtml(options.matchLabel)}</h2>
        <p>O robô <strong>${escapeHtml(options.teamNumber)}</strong> está na posição de largada, com 4 POLLEN pré-carregados (G304).
        O AUTO dura 30 s e roda o programa escolhido; depois de 8 s de transição, você assume no TELEOP (2:00).</p>
-       <p class="notice">Nesta versão a aliança azul não tem robôs (treino solo). Os robôs-bot chegam no marco M9.</p>
+       ${options.bots && (options.bots.partner || options.bots.opponents) ? `<p class="notice">Na arena: ${[options.bots.partner && "1 parceiro", options.bots.opponents && `${options.bots.opponents} adversário(s)`].filter(Boolean).join(" e ")} controlados pelo simulador.</p>` : `<p class="notice">Treino solo: sem robôs-bot (ative na tela "Jogar").</p>`}
        <div class="actions"><button class="btn btn-primary" data-m="go">Iniciar partida</button>
        <button class="btn btn-secondary" data-m="exit">Voltar</button></div>`,
       (el) => {
@@ -429,6 +429,10 @@ export async function mountGameScreen(root: HTMLElement, options: GameOptions, a
   const rpState = { red: "", blue: "" };
   const onView = (view: GameView) => {
     const { red, blue } = view.score;
+    for (const alliance of ["red", "blue"] as const) {
+      const spans = q(`[data-teams="${alliance}"]`).children;
+      for (let i = 0; i < 2; i++) spans[i].textContent = view.teams[alliance][i] ?? "—";
+    }
     counters.red.set(red.total);
     counters.blue.set(blue.total);
     for (const [alliance, score] of [["red", red], ["blue", blue]] as const) {

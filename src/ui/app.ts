@@ -12,6 +12,7 @@ import { CAD_PREFIX, listRobots } from "../workshop/robotStore";
 import { bindRanking, rankingHtml } from "./ranking";
 import { getProject, listProjects, opModeRef, parseOpModeRef, type HardwareUse } from "../java/project";
 import type { JavaOpModeRun, JavaSetup } from "../game/game";
+import { BOT_LEVELS, type BotLevel } from "../game/bot";
 
 type Route = "home" | "setup" | "workshop" | "leaderboard" | "teamRobots" | "about";
 
@@ -200,6 +201,17 @@ export class App {
           <small>Variantes inspiradas nos starter bots públicos do BIOBUZZ. Os starter bots não pontuam na FLOWER: só tiram POLLEN dela.</small>
         </fieldset>
         <fieldset class="field choices">
+          <legend>Robôs na partida</legend>
+          <label class="choice"><input type="checkbox" id="bot-partner" ${p.botPartner ? "checked" : ""}><span>Parceiro (bot) na aliança vermelha<small>Coleta POLLEN, lança na sua HIVE e estaciona no fim.</small></span></label>
+          <div class="field-row">
+            <label for="bot-opponents">Adversários azuis</label>
+            <select id="bot-opponents">${[0, 1, 2].map((n) => `<option value="${n}" ${p.botOpponents === n ? "selected" : ""}>${n === 0 ? "nenhum" : `${n} bot${n > 1 ? "s" : ""}`}</option>`).join("")}</select>
+            <label for="bot-level">Nível</label>
+            <select id="bot-level">${(Object.keys(BOT_LEVELS) as BotLevel[]).map((l) => `<option value="${l}" ${p.botLevel === l ? "selected" : ""}>${BOT_LEVELS[l].label}</option>`).join("")}</select>
+          </div>
+          <small>Os bots usam os starter bots (goBILDA, REV DUO e AndyMark). O HUMAN PLAYER azul também é do simulador.</small>
+        </fieldset>
+        <fieldset class="field choices">
           <legend>Programa do AUTO</legend>
           ${autoChoices}
           <div data-java-auto></div>
@@ -237,6 +249,9 @@ export class App {
         eventName: form.querySelector<HTMLInputElement>("#event")!.value.trim() || "Treino da equipe",
         ...readAutoChoice(form.querySelector<HTMLInputElement>('input[name="auto"]:checked')?.value, this.prefs.autoProgram),
         javaTeleop: form.querySelector<HTMLInputElement>('input[name="teleop"]:checked')?.value ?? "",
+        botPartner: form.querySelector<HTMLInputElement>("#bot-partner")!.checked,
+        botOpponents: Number(form.querySelector<HTMLSelectElement>("#bot-opponents")!.value) as 0 | 1 | 2,
+        botLevel: form.querySelector<HTMLSelectElement>("#bot-level")!.value as BotLevel,
         quality: form.querySelector<HTMLSelectElement>("#quality")!.value as Quality,
         launchIntervalS: clampInterval(Number(form.querySelector<HTMLInputElement>("#interval")!.value.replace(",", "."))),
         ...readRobotChoice(form.querySelector<HTMLInputElement>('input[name="robot"]:checked')),
@@ -340,6 +355,7 @@ export class App {
       launchIntervalS: clampInterval(this.prefs.launchIntervalS),
       robotPreset: this.prefs.robotPreset,
       robotModelId: this.prefs.robotModelId || undefined,
+      bots: { partner: this.prefs.botPartner, opponents: this.prefs.botOpponents, level: this.prefs.botLevel },
     };
     history.replaceState(null, "", "#play");
     this.root.innerHTML = "";

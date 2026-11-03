@@ -33,6 +33,10 @@ export interface Preferences {
   /** OpModes Java escolhidos ("<projeto>|<classe>"); vazio = programa de exemplo / pilotagem manual. */
   javaAuto: string;
   javaTeleop: string;
+  /** Robôs-bot: parceiro na aliança vermelha, adversários azuis (0–2) e nível. */
+  botPartner: boolean;
+  botOpponents: 0 | 1 | 2;
+  botLevel: "easy" | "medium" | "hard";
 }
 
 const PREFS_KEY = "buzz-simulator:prefs";
@@ -46,7 +50,7 @@ export function defaultQuality(): Quality {
 }
 
 export function loadPrefs(): Preferences {
-  const fallback: Preferences = { teamNumber: "24823", quality: defaultQuality(), autoProgram: "leavePark", eventName: "Treino da equipe", launchIntervalS: DEFAULT_LAUNCH_INTERVAL_S, robotPreset: "generic", robotModelId: "", javaAuto: "", javaTeleop: "" };
+  const fallback: Preferences = { teamNumber: "24823", quality: defaultQuality(), autoProgram: "leavePark", eventName: "Treino da equipe", launchIntervalS: DEFAULT_LAUNCH_INTERVAL_S, robotPreset: "generic", robotModelId: "", javaAuto: "", javaTeleop: "", botPartner: true, botOpponents: 2, botLevel: "medium" };
   try {
     const raw = localStorage.getItem(PREFS_KEY);
     return raw ? { ...fallback, ...(JSON.parse(raw) as Partial<Preferences>) } : fallback;
