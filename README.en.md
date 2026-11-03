@@ -1,158 +1,185 @@
-# Buzz Simulator
+# 🐝 Buzz Simulator
 
-[![GitHub](https://img.shields.io/badge/GitHub-contatolucashrosa--bit-181717?logo=github)](https://github.com/contatolucashrosa-bit)
-[![LinkedIn](https://img.shields.io/badge/LinkedIn-lucas--hochmann--rosa-0A66C2?logo=linkedin)](https://www.linkedin.com/in/lucas-hochmann-rosa)
-[![TypeScript](https://img.shields.io/badge/TypeScript-Three.js%20%2B%20Rapier-3178C6?logo=typescript)](#technologies)
-[![License: MIT](https://img.shields.io/badge/license-MIT-green)](LICENSE)
+<p align="center">
+  <a href="https://github.com/contatolucashrosa-bit/ftc-buzz-simulator">
+    <img src="https://img.shields.io/badge/GitHub-ftc--buzz--simulator-181717?style=for-the-badge&logo=github">
+  </a>
+  <a href="https://www.linkedin.com/in/lucas-hochmann-rosa">
+    <img src="https://img.shields.io/badge/LinkedIn-Lucas_Hochmann_Rosa-0A66C2?style=for-the-badge&logo=linkedin">
+  </a>
+  <a href="#-technologies">
+    <img src="https://img.shields.io/badge/TypeScript-7-3178C6?style=for-the-badge&logo=typescript&logoColor=white">
+  </a>
+  <a href="#-technologies">
+    <img src="https://img.shields.io/badge/Three.js-0.187-000000?style=for-the-badge&logo=threedotjs&logoColor=white">
+  </a>
+  <a href="#-technologies">
+    <img src="https://img.shields.io/badge/Vite-8-646CFF?style=for-the-badge&logo=vite&logoColor=white">
+  </a>
+  <a href="LICENSE">
+    <img src="https://img.shields.io/badge/License-MIT-2ea44f?style=for-the-badge">
+  </a>
+</p>
 
-[🇧🇷 Português](README.md) · 🇺🇸 English
+<p align="center"><a href="README.md">🇧🇷 Português</a> · 🇺🇸 English</p>
 
-> Design, program and play FTC — right in your browser.
+> Design, program and play FTC — right in the browser. Built in partnership with **[WestSharksFTC #24823](https://www.westsharksftc.com/)**.
 
-Created by **Lucas Hochmann Rosa** ([github.com/contatolucashrosa-bit](https://github.com/contatolucashrosa-bit)), in partnership with **[WestSharksFTC #24823](https://www.westsharksftc.com/)**.
+---
 
-## Overview
+## ⚡ Quick Start
 
-Buzz Simulator is a 3D simulator of the **BIOBUZZ™ presented by RTX** season (*FIRST*® Tech Challenge 2026-2027), fully in Brazilian Portuguese. It is built for high school students to practice strategy, driving and, in the next milestones, robot CAD and programming, without needing the physical robot.
+```bash
+git clone https://github.com/contatolucashrosa-bit/ftc-buzz-simulator.git
+cd ftc-buzz-simulator
+npm install
+npm run dev
+```
 
-**Platform independent:** it runs in the browser on Windows, macOS, Linux, Chromebook and tablets, **with no installation, no account and no server**. Everything stays on the device.
+To build and test the production version:
+
+```bash
+npm run build
+npm run preview
+```
+
+---
+
+## 📌 Overview
+
+**Buzz Simulator** is a 3D simulator of the **BIOBUZZ™ presented by RTX** season (*FIRST*® Tech Challenge 2026-2027), entirely in Brazilian Portuguese. High school students practice strategy, driving, CAD and robot programming without needing the physical robot.
+
+It runs in the browser on Windows, macOS, Linux, Chromebooks and tablets, **with no installation, no account and no server**. Everything stays on the device and, after the first visit, it works offline.
 
 The source of truth for the rules is the official *BIOBUZZ Competition Manual*, version **TU07**.
 
-## Features
+> **Testing version (0.x):** rules, physics and scoring may still change between versions.
 
-Available now (milestones M0–M3):
-- **3D field** built from the manual's dimensions:
-  - 36 TILES, LOADING ZONES and GARDENS;
-  - HIVE structure with two bi-stable HIVEs (±30° seesaws);
-  - 4 FLOWERS with rings and scoring volume.
-- **40 POLLEN and 16 NECTAR** in the official staging (§10.3.1), with real physics (Rapier).
-- **Generic 18 × 18 in robot** with:
-  - mecanum drive;
-  - an intake for up to 4 elements (G407) that never takes opponent NECTAR (G408);
-  - a launcher with trajectory preview;
-  - a "place" action for the FLOWERS.
-- **Robot variants** inspired by the public BIOBUZZ starter bots (our own 3D models; the CADs are not redistributed):
-  - **goBILDA**: drop-center 6WD, Gecko wheel intake that pulls POLLEN out of the FLOWER;
-  - **REV DUO**: belt tank drive and a servo that takes POLLEN out of the FLOWER;
-  - **AndyMark Robits**: tank drive with omni and stealth wheels, hooded launcher and a release servo.
-  - The starter bots cannot strafe or score in the FLOWER. Details in [docs/starter-bots.md](docs/starter-bots.md) (in Portuguese).
-- **Bot robots**: a partner and up to 2 opponents controlled by the simulator (easy, medium or hard), with an automatic blue HUMAN PLAYER. They collect POLLEN, launch into their own HIVE taking turns, and park at the end. Details in [docs/bots.md](docs/bots.md) (in Portuguese).
-- **Android Studio Java code in the match**: import the TeamCode folder or `.zip` in the Workshop, unchanged (Pedro Pathing and RoadRunner included). Pick an @Autonomous OpMode for AUTO and a @TeleOp for TELEOP: INIT, START and STOP follow the match, like the Driver Station. Compilation runs in the background, with caching, Portuguese error messages and telemetry in the HUD. Details in [docs/m5a-java-runtime.md](docs/m5a-java-runtime.md) (in Portuguese).
-- **Workshop with CAD import**: GLB, STL and STEP (up to 40 MB in the browser). Larger assemblies go through the `npm run cad:convert` converter. The model is oriented, checked against R102 and stored on this device; it then shows up on the "Play" screen. Details in [docs/cad-import.md](docs/cad-import.md) (in Portuguese).
-- **Event scenery** generated in code: sky with clouds, grass, low-poly forest, mushrooms and flowers, backdrops with WestSharks banners (with a slot for the authorized logo), three bleachers with an audience and, in each ALLIANCE AREA, 2 beekeeper HUMAN PLAYERS, 2 drivers and 1 coach.
-- **Perforated POLLEN and NECTAR**: 26 holes, with the diameters from the official drawings.
-- **Full match**: 30 s AUTO, 8 s transition and 2:00 TELEOP, with the official clock.
-- **Automatic scoring** of every row of Table 10-2:
-  - LEAVE, PARK, HIVE TIP (AUTO/TELEOP), CELL, FLOWER (owner + bottom NECTAR bonus) and GARDEN;
-  - SWARM, POLLINATOR 1 and 2 **RANKING POINTS**.
+---
+
+## ✨ Main Features
+
+- **3D field with the manual's measurements:** 36 TILES, LOADING ZONES, GARDENS, the structure with two bistable HIVEs (±30°) and 4 FLOWERS; 40 POLLEN and 16 perforated NECTAR in the official starting layout (§10.3.1), with real physics.
+- **Full match:** 30 s AUTO, 8 s transition and 2:00 TELEOP, with the official clock and buzzers.
+- **Automatic scoring** of every line in Table 10-2 and the SWARM, POLLINATOR 1 and 2 RANKING POINTS.
 - **Automatic fouls**, with a MAJOR FOUL credited to the opponent:
   - G410: NECTAR in a FLOWER before 1:00;
   - G402: touching an opponent while fully on their side during AUTO;
   - G405: launching an element out of the field, away from your own HIVE;
   - G421: PIN against the wall or another robot for more than 3 s (plus another MAJOR every 3 s).
-- **Local second player**: the red partner can be driven by another person on the same computer (I/K drive, J/L turn, H intake, Y launch with automatic aim, U uses the FLOWER) or with a second gamepad.
-- **HUMAN PLAYER**: enters NECTAR through the LOADING ZONE, 1 per TIP or all of it with 1:00 left (G426).
-- **Natively recreated Score Overlay**: event bar, alliances, RP icons, team numbers and timer.
-- **Animated scoreboard and results**: count-up numbers with "+N", RP icons that light up when earned, a results screen with the team record and ranking position.
-- **Replay** of the last 30 s (pause menu or end of match), with 0.25× to 2× speeds and a position slider.
-- **Team robots**: export a Workshop robot as `.buzzrobot.zip` (model, measurements, mechanisms and credit) and import it on another computer.
-- **Leaderboards**: local qualification ranking (average RP, average points and high score), match history and a class ranking by JSON file (export and import).
-- **Sample autonomous routines**: LEAVE, LEAVE + PARK, or launching into the HIVE and parking.
-- **Controls**: keyboard, gamepad and touch; audience, driver, robot, top-down and free cameras.
-- **Adjustable quality** for modest school computers.
+- **Robots:** an 18 × 18 in practice robot (mecanum) and variants inspired by the public starter bots (goBILDA, REV DUO, AndyMark), with measurements taken from their CAD.
+- **Bot robots:** a partner and up to 2 opponents (easy, medium or hard), with an automatic blue HUMAN PLAYER.
+- **Local second player:** the red partner can be driven by another person on the same computer or with a second gamepad.
+- **Android Studio Java code in the match:** import TeamCode (folder or `.zip`) unchanged, including Pedro Pathing and RoadRunner; INIT, START and STOP follow the match, with telemetry in the HUD and compile errors in Portuguese.
+- **CAD Workshop:** imports GLB, STL and STEP (up to 40 MB in the browser), orients the model, checks R102 and stores it on the device.
+- **Team robots:** export and import robots as `.buzzrobot.zip`, with model, measurements, mechanisms and credit.
+- Recreated **Score Overlay**, animated scoreboard, results screen, **replay** of the last 30 s and an exportable local **ranking**.
+- **Event scenery** generated in code, with audience, drivers, coaches and animated HUMAN PLAYERS, plus synthesized **sounds**.
+- **Controls** for keyboard, gamepad and touch; adjustable graphics quality for modest school computers.
 
-Next milestones: vision (AprilTag) in the simulated SDK and mechanism tagging on the CAD. The full roadmap is in [docs/phase-1-analysis.md](docs/phase-1-analysis.md) (in Portuguese).
+---
 
-## Table of Contents
+## 🧭 Table of Contents
 
-- [Architecture](#architecture)
-- [Technologies](#technologies)
-- [Project build rules](#project-build-rules)
-- [Requirements](#requirements)
-- [Installation](#installation)
-- [Running](#running)
-- [Web Interface](#web-interface)
-- [Disclaimer](#disclaimer)
-- [Author](#author)
-- [License](#license)
+- [Architecture](#️-architecture)
+- [Module Map](#️-module-map)
+- [Technologies](#-technologies)
+- [Match flow](#-match-flow)
+- [Project construction rules](#-project-construction-rules)
+- [Requirements](#️-requirements)
+- [Installation](#-installation)
+- [Environment Configuration](#-environment-configuration)
+- [Running](#️-running)
+- [Deploy and offline use](#-deploy-and-offline-use)
+- [Notices](#️-notices)
+- [License](#-license)
+- [Author](#-author)
 
-## Architecture
+---
 
-```
+## 🏗️ Architecture
+
+```text
 ftc-buzz-simulator/
-├── data/rules/biobuzz-tu07.json   # manual rules as data (points, timing, dimensions), with page citations
-├── docs/phase-1-analysis.md       # Phase 1 analysis, decisions and roadmap
-├── docs/starter-bots.md           # mechanisms and limitations of the reference starter bots
-├── docs/cad-import.md             # Workshop CAD import and the STEP → GLB converter
-├── scripts/step-to-glb.mjs        # converter for large STEP assemblies (npm run cad:convert)
-├── src/
-│   ├── rules/        # typed access to the rules file
-│   ├── scoring/      # pure scoring engine (Table 10-2) + tests
-│   ├── match/        # match clock and HUMAN PLAYER rules + tests
-│   ├── sim/          # physics and models: field, HIVE, FLOWER, elements, robot
-│   ├── game/         # match controller and sample autonomous routines
-│   ├── render/       # Three.js stage, cameras, scenery and quality presets
-│   ├── config/       # preferences, defaults and robot variants (lightweight modules)
-│   ├── input/        # keyboard, gamepad and touch
-│   ├── ui/           # screens, Score Overlay and HUD
-│   └── styles/       # FIRST color tokens and styles
-└── cad/              # (not in git) official field CAD, for calibration
+├── index.html
+├── package.json
+├── vite.config.ts
+├── data/rules/biobuzz-tu07.json    # manual rules as data, with the cited page
+├── docs/                           # analysis, roadmap, CAD, Java, bots and starter bots
+├── examples/TeamCode/              # sample OpModes to import in the Workshop
+├── public/                         # icon and manifest for the installable app
+├── scripts/                        # STEP → GLB converter, Java libs build and offline plugin
+├── vendor/java-libs/               # in-browser Java compiler and simulated FTC SDK (jar)
+└── src/
+    ├── rules/      # typed reading of the rules file
+    ├── scoring/    # pure scoring engine (Table 10-2)
+    ├── match/      # clock, HUMAN PLAYER and match history
+    ├── sim/        # physics: field, HIVE, FLOWER, elements and robot
+    ├── game/       # match, autonomous routines, bots, fouls and replay
+    ├── java/       # simulated FTC SDK, compilation and hardware bridge
+    ├── workshop/   # CAD import, storage and robot packages
+    ├── render/     # Three.js stage, scenery and sounds
+    ├── input/      # keyboard, gamepad and touch
+    ├── config/     # preferences and robot variants
+    ├── ui/         # screens, Score Overlay and HUD
+    └── styles/     # FIRST color tokens and styles
 ```
 
-The scoring engine does not depend on 3D: it takes a "snapshot" of the match and returns points and RP. That is why each rule can be tested in isolation. Physics runs on a fixed step, so the same inputs give the same result.
+The scoring engine does not depend on 3D: it takes a "snapshot" of the match and returns points and RP, so each rule is tested in isolation. Physics runs at a fixed step: the same inputs give the same result.
 
-## Technologies
+---
 
-| Layer | Choice | Why |
-|---|---|---|
-| Language | TypeScript | Native to the browser; strong typing for the rules |
-| 3D | Three.js | Lightweight and runs on WebGL 2 on older Chromebooks |
-| Physics | Rapier (WASM) | Fast and deterministic (replays) |
-| Build | Vite | Static site that can be hosted for free |
-| Tests | Vitest | One test per row of Table 10-2 |
-| Font | Roboto (bundled) | Official *FIRST* font, works offline |
+## 🗺️ Module Map
 
-## Project build rules
+| File | Purpose |
+| ------ | ------ |
+| `src/game/game.ts` | Match controller: phases, robots, bots, Java, fouls, sounds and replay. |
+| `src/scoring/scoring.ts` | Table 10-2 scoring, fouls and RANKING POINTS. |
+| `src/game/fouls.ts` | Contact fouls (G402 and G421) from geometry. |
+| `src/game/bot.ts` | Bot brain: collect, launch taking turns and park. |
+| `src/sim/robot.ts` | Physical robot: drivetrain, intake, launcher and FLOWER mechanism. |
+| `src/sim/hive.ts` / `src/sim/flower.ts` | Tipping HIVE (TIP) and FLOWER stack. |
+| `src/java/javaRuntime.ts` | Compiles TeamCode in the browser and runs the OpMode. |
+| `src/java/hardwareBus.ts` | Connects the Java `hardwareMap` to the simulated motors and sensors. |
+| `src/workshop/cadImport.ts` | Reading and normalizing GLB, STL and STEP. |
+| `src/workshop/robotPackage.ts` | `.buzzrobot.zip` package for moving robots between computers. |
+| `src/ui/app.ts` | Navigation and the Home, Play, Workshop, Leaderboards, Team robots and About screens. |
+| `scripts/step-to-glb.mjs` | Converts large STEP assemblies to GLB (`npm run cad:convert`). |
+| `scripts/offline-plugin.mjs` | Generates the service worker that makes the app work offline. |
 
-- **Logic in English**: identifiers, file and folder names, keys of the rules JSON and technical log messages.
-- **Comments and documentation in Portuguese**: comments only when they explain a "why", and the README and the whole user interface in Brazilian Portuguese.
-- Official FTC terms (POLLEN, NECTAR, HIVE, TIP, FLOWER, GARDEN, LOADING ZONE, LEAVE, PARK) follow the manual's spelling.
-- Every implemented rule cites the manual's section or page. Anything not in the manual is marked as an **assumption** in `data/rules/biobuzz-tu07.json`.
+---
 
-## Requirements
+## 🧰 Technologies
 
-- **To play:** a modern browser with WebGL 2 and WebAssembly (current Chrome, Edge, Firefox or Safari).
-- **To develop:** Node.js 20 or newer.
+**Language:** TypeScript 7, with strong typing for the rules.
 
-## Installation
+**3D:** Three.js, which runs on the WebGL 2 of old Chromebooks.
 
-```bash
-npm install
-```
+**Physics:** Rapier (WebAssembly), fast and deterministic.
 
-## Running
+**Build and tests:** Vite 8 and Vitest.
 
-| Command | What it does |
-|---|---|
-| `npm run dev` | Development server at `http://localhost:5173` |
-| `npm test` | Tests for the scoring rules, clock and HIVE |
-| `npm run build` | Type-checks and generates the static site in `dist/` |
-| `npm run preview` | Serves `dist/` locally for checking |
-| `npm run cad:convert -- robot.step robot.glb` | Converts a large robot STEP into a GLB for the Workshop |
+**Java in the browser:** `javac` + TeaVM in a Web Worker, with a simulated FTC SDK, Pedro Pathing and RoadRunner.
 
-The contents of `dist/` can be published on any free static host, such as GitHub Pages.
+**CAD:** `occt-import-js` (OpenCascade in WebAssembly) and `meshoptimizer`.
 
-**Offline (PWA):** on the first visit, the service worker stores the app on this device (about 21 MB, including the Java compiler). After that, Buzz Simulator opens and plays without internet, and the browser offers "Install app". In-browser STEP reading (7.6 MB) is stored the first time it is used.
+**Audio:** Web Audio API, with no sound files.
 
-## Web Interface
+**Font:** bundled Roboto, *FIRST*'s official font, which works offline.
 
-- **Home:** introduction, "Play in the browser" button and supported platforms.
-- **Play:** team number, event name, robot, AUTO routine, time between launches and graphics quality.
-- **Workshop:** import the robot CAD (GLB, STL or STEP), orient it, check its size (R102), choose the mechanisms and save it.
-- **Arena:** Score Overlay at the top, robot HUD (hopper, launcher, released NECTAR) and controls help.
+---
 
-**Controls:**
+## 🎮 Match flow
+
+On the **Play** screen the team picks its number, event, robot, AUTO program (sample or Java), partner (bot, second player or none), opponents and level. The match follows the manual:
+
+| Phase | Duration | Who is in control |
+| --- | --- | --- |
+| AUTO | 30 s | Chosen program (sample or Java OpMode) |
+| Transition | 8 s | Robots stopped (G403) |
+| TELEOP | 2:00 | Driver (or Java OpMode); with 1:00 left, FLOWERS and all NECTAR are released |
+
+**Player 1 controls:**
 
 | Action | Keyboard | Gamepad |
 |---|---|---|
@@ -160,28 +187,100 @@ The contents of `dist/` can be published on any free static host, such as GitHub
 | Turn | Q / E | right stick |
 | Intake (hold) | Space | LT or LB |
 | Launch the whole hopper in a burst | F | RT |
-| FLOWER mechanism: place (training robot) or retrieval servo (REV DUO, AndyMark) | G | RB |
+| FLOWER mechanism: place (practice robot) or removal servo (REV DUO, AndyMark) | G | RB |
 | Launcher speed / angle | ↑ ↓ / ← → | D-pad |
-| HUMAN PLAYER: enter NECTAR | N | Y |
+| HUMAN PLAYER: introduce NECTAR | N | Y |
 | Camera · drive mode · restart · pause | C · O · R · Esc | Back · — · — · Start |
 | Scoreboard: broadcast → driver → hidden | V | — |
-| "Follow robot" camera: orbit / tilt / zoom | drag the mouse / wheel / double-click resets | right stick ↕ tilts; R3 + ↔ orbits |
+| "Follow robot" camera: orbit / tilt / zoom | drag the mouse / wheel / double click resets | right stick ↕ tilts; R3 + ↔ orbits |
 
-## Disclaimer
+**Second player controls:** I/K drive, J/L turn, H intake, Y launch (automatic aim at the upper CELL), U uses the FLOWER. Or a second connected gamepad.
+
+---
+
+## 📐 Project construction rules
+
+- Identifiers, file and folder names, rules JSON keys and technical log messages are in English.
+- Interface text and documentation are in Brazilian Portuguese.
+- Code comments are in Portuguese, reserved for non-obvious decisions — the "why", not the "what".
+- Official FTC terms (POLLEN, NECTAR, HIVE, TIP, FLOWER, GARDEN, LOADING ZONE, LEAVE, PARK) follow the manual's spelling.
+- Every implemented rule cites the manual section or page. Anything not in the manual is marked as an **assumption** in `data/rules/biobuzz-tu07.json`.
+
+---
+
+## ⚙️ Requirements
+
+- **To play:** a modern browser with WebGL 2 and WebAssembly (current Chrome, Edge, Firefox or Safari). The fastest Java path uses WasmGC (Chrome/Edge 119+, Firefox 120+, Safari 18.2+).
+- **To develop:** Node.js 20 or newer and npm 10 or newer.
+- **To rebuild the Java libraries (optional):** a local JDK (`npm run java:libs`).
+
+---
+
+## 🚀 Installation
+
+```bash
+npm install
+```
+
+---
+
+## 🔐 Environment Configuration
+
+This project uses no environment variables. The application runs entirely in the browser and stores robots, Java projects and matches on the device itself (IndexedDB and localStorage).
+
+---
+
+## ▶️ Running
+
+| Command | What it does |
+|---|---|
+| `npm run dev` | Development server at `http://localhost:5173` |
+| `npm test` | Scoring, clock, HIVE, FLOWER, bot, foul, Java and package tests |
+| `npm run build` | Type-checks and builds the static site into `dist/` |
+| `npm run preview` | Serves `dist/` locally for checking |
+| `npm run cad:convert -- robot.step robot.glb` | Converts a large robot STEP into GLB for the Workshop |
+| `npm run java:libs` | Rebuilds the simulated FTC SDK and Pedro Pathing |
+
+---
+
+## 🌐 Deploy and offline use
+
+The contents of `dist/` are a static site and can be published on any free host, such as GitHub Pages.
+
+**Offline (PWA):** on the first visit, the service worker stores the app on the device (about 21 MB, including the Java compiler). After that, Buzz Simulator opens and plays without internet, and the browser offers "Install app". The in-browser STEP reader (7.6 MB) is stored the first time it is used.
+
+---
+
+## ⚠️ Notices
 
 - Buzz Simulator is an **independent project, not affiliated with or endorsed by *FIRST*®**. *FIRST*®, *FIRST*® Tech Challenge and BIOBUZZ™ are registered trademarks of For Inspiration and Recognition of Science and Technology (*FIRST*).
-- No logos or protected assets are used. The 3D models and icons were recreated for this project; colors follow the official *FIRST* palette.
+- No protected logo or asset is used. The 3D models and icons were recreated for this project; the colors follow *FIRST*'s official palette. The manual and the official CAD files are not redistributed.
 - **Known limitations:**
   - the mass that tips the HIVE is not in the manual; the current value is a tunable assumption;
-  - the exact positions of the FLOWERS and zones were estimated from the manual's figures, until they are checked against the official CAD;
-  - contact fouls (G402, G405 and G421) are estimated from physics, with no referee: G405 intent is inferred from the launch direction.
+  - the exact position of the FLOWERS and zones was estimated from the manual's figures, until checked against the official CAD;
+  - contact fouls are estimated from physics, with no referee: G405 intent is inferred from the launch direction;
+  - vision (AprilTag) does not exist yet in the simulated Java SDK.
+- The `dist/` directory is generated by the build and must not be committed.
 
-## Author
+Detailed documentation (in Portuguese): [roadmap](docs/phase-1-analysis.md) · [Java](docs/m5a-java-runtime.md) · [CAD](docs/cad-import.md) · [starter bots](docs/starter-bots.md) · [bot robots](docs/bots.md).
 
-**Lucas Hochmann Rosa** — [GitHub](https://github.com/contatolucashrosa-bit) · hrlucas.dev@gmail.com
+---
+
+## 📄 License
+
+Licensed under MIT. Feel free to use, modify and distribute it, keeping the copyright notice and crediting **Lucas Hochmann Rosa**.
+
+---
+
+## 👨‍💻 Author
+
+**Lucas Hochmann Rosa**
+
+- Repository: <https://github.com/contatolucashrosa-bit/ftc-buzz-simulator>
+- GitHub: <https://github.com/contatolucashrosa-bit>
+- LinkedIn: <https://www.linkedin.com/in/lucas-hochmann-rosa>
+- E-mail: hrlucas.dev@gmail.com
 
 In partnership with **WestSharksFTC #24823** (SESI SENAI Chapecó).
 
-## License
-
-Distributed under the [MIT](LICENSE) license.
+---
