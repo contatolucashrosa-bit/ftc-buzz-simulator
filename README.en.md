@@ -55,7 +55,7 @@ Available now (milestones M0–M3):
 - **Controls**: keyboard, gamepad and touch; audience, driver, robot, top-down and free cameras.
 - **Adjustable quality** for modest school computers.
 
-Next milestones: mechanism tagging on the CAD, vision (AprilTag), bot robots and a 100% offline mode (PWA). The full roadmap is in [docs/phase-1-analysis.md](docs/phase-1-analysis.md) (in Portuguese).
+Next milestones: mechanism tagging on the CAD, vision (AprilTag), bot robots and more teams in the match. The full roadmap is in [docs/phase-1-analysis.md](docs/phase-1-analysis.md) (in Portuguese).
 
 ## Table of Contents
 
@@ -132,8 +132,11 @@ npm install
 | `npm test` | Tests for the scoring rules, clock and HIVE |
 | `npm run build` | Type-checks and generates the static site in `dist/` |
 | `npm run preview` | Serves `dist/` locally for checking |
+| `npm run cad:convert -- robot.step robot.glb` | Converts a large robot STEP into a GLB for the Workshop |
 
 The contents of `dist/` can be published on any free static host, such as GitHub Pages.
+
+**Offline (PWA):** on the first visit, the service worker stores the app on this device (about 21 MB, including the Java compiler). After that, Buzz Simulator opens and plays without internet, and the browser offers "Install app". In-browser STEP reading (7.6 MB) is stored the first time it is used.
 
 ## Web Interface
 

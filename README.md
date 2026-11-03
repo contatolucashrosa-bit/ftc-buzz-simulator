@@ -55,7 +55,7 @@ Já disponível (marcos M0–M3):
 - **Controles**: teclado, gamepad e toque; câmeras de plateia, piloto, robô, de cima e livre.
 - **Qualidade ajustável** para computadores escolares modestos.
 
-Próximos marcos: marcação de mecanismos no CAD, visão (AprilTag), robôs-bot e modo 100% offline (PWA). O roadmap completo está em [docs/phase-1-analysis.md](docs/phase-1-analysis.md).
+Próximos marcos: marcação de mecanismos no CAD, visão (AprilTag), robôs-bot e mais equipes na partida. O roadmap completo está em [docs/phase-1-analysis.md](docs/phase-1-analysis.md).
 
 ## Sumário
 
@@ -132,8 +132,11 @@ npm install
 | `npm test` | Testes das regras de pontuação, relógio e HIVE |
 | `npm run build` | Verifica os tipos e gera o site estático em `dist/` |
 | `npm run preview` | Serve o `dist/` localmente para conferência |
+| `npm run cad:convert -- robo.step robo.glb` | Converte um STEP grande de robô em GLB para a Oficina |
 
 O conteúdo de `dist/` pode ser publicado em qualquer hospedagem estática gratuita, como o GitHub Pages.
+
+**Offline (PWA):** no primeiro acesso, o service worker guarda o app neste aparelho (cerca de 21 MB, com o compilador Java). Depois disso, o Buzz Simulator abre e joga sem internet, e o navegador oferece "Instalar app". A leitura de STEP no navegador (7,6 MB) é guardada na primeira vez que for usada.
 
 ## Interface Web
 
