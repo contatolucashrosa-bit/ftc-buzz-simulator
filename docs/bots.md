@@ -43,5 +43,6 @@ Com 4 robôs, um quadro do jogo leva em média 6,5 ms (p95 8,1 ms): cabe nos 60 
 
 ## Limitações
 - Os bots não usam o servo de retirada da FLOWER nem colocam elementos nela.
-- Faltas de contato entre robôs (G4xx) ainda não são avaliadas.
+- No AUTO, os bots só coletam no próprio lado, para não cometer G402.
+- O parceiro vermelho pode ser um 2º jogador local; nesse caso o bot só roda o AUTO dele.
 - O replay grava todos os robôs, mas o código Java da equipe só controla o vermelho 1.

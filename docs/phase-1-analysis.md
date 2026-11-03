@@ -458,7 +458,7 @@ Cada marco termina com algo testável e com instruções de teste.
 - NECTAR do HUMAN PLAYER;
 - tela de resultado.
 
-Ainda pendente no M4: as faltas G402, G405, G421 e G426/G427 por detecção física.
+M4 concluído em 03/11/2026: G402, G405 e G421 são detectadas pela física. G426/G427 não acontecem no simulador, porque o HUMAN PLAYER só introduz NECTAR quando a regra libera e sempre pela LOADING ZONE.
 
 **M5a concluído:** TeamCode real (SDK, Pedro Pathing 3.0.2 e o Quickstart inteiro do RoadRunner) compila e roda no navegador sem alterações. Detalhes, medições e limitações em [m5a-java-runtime.md](m5a-java-runtime.md). Próximo: **M5** (integrar o runtime Java ao jogo).
 

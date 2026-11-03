@@ -46,17 +46,23 @@ Já disponível (marcos M0–M3):
 - **Pontuação automática** de todas as linhas da Tabela 10-2:
   - LEAVE, PARK, HIVE TIP (AUTO/TELEOP), CELL, FLOWER (dona + bônus do NECTAR mais baixo) e GARDEN;
   - **RANKING POINTS** SWARM, POLLINATOR 1 e 2.
-- **Faltas automáticas**: G410 (NECTAR na FLOWER antes de 1:00), com MAJOR FOUL creditado à adversária.
+- **Faltas automáticas**, com MAJOR FOUL creditado à adversária:
+  - G410: NECTAR na FLOWER antes de 1:00;
+  - G402: encostar num adversário estando todo no lado dele durante o AUTO;
+  - G405: lançar um elemento para fora do campo, para longe da própria HIVE;
+  - G421: PIN contra a parede ou outro robô por mais de 3 s (e outra MAJOR a cada 3 s).
+- **2º jogador local**: o parceiro vermelho pode ser pilotado por outra pessoa no mesmo computador (I/K anda, J/L gira, H coleta, Y lança com mira automática, U usa a FLOWER) ou pelo 2º controle.
 - **HUMAN PLAYER**: introduz NECTAR pela LOADING ZONE, 1 por TIP ou todos com 1:00 restante (G426).
 - **Score Overlay** recriado nativamente: barra do evento, alianças, ícones de RP, números das equipes e cronômetro.
 - **Placar animado e resultados**: números que sobem contando com "+N", ícones de RP que acendem ao serem conquistados, tela de resultado com recorde da equipe e posição no ranking.
 - **Replay** dos últimos 30 s (pausa ou fim da partida), com velocidades de 0,25× a 2× e barra de posição.
+- **Robôs da equipe**: exporte um robô da Oficina como `.buzzrobot.zip` (modelo, medidas, mecanismos e crédito) e importe em outro computador.
 - **Placares**: ranking de qualificação local (média de RP, média de pontos e recorde), histórico de partidas e ranking da turma por arquivo JSON (exportar e importar).
 - **Autônomos de exemplo**: LEAVE, LEAVE + PARK, ou lançar na HIVE e estacionar.
 - **Controles**: teclado, gamepad e toque; câmeras de plateia, piloto, robô, de cima e livre.
 - **Qualidade ajustável** para computadores escolares modestos.
 
-Próximos marcos: marcação de mecanismos no CAD, visão (AprilTag) e faltas de contato entre robôs. O roadmap completo está em [docs/phase-1-analysis.md](docs/phase-1-analysis.md).
+Próximos marcos: visão (AprilTag) no SDK simulado e marcação de mecanismos no CAD. O roadmap completo está em [docs/phase-1-analysis.md](docs/phase-1-analysis.md).
 
 ## Sumário
 
@@ -168,7 +174,7 @@ O conteúdo de `dist/` pode ser publicado em qualquer hospedagem estática gratu
 - **Limitações conhecidas:**
   - a massa que faz a HIVE virar não consta no manual; o valor atual é uma suposição calibrável;
   - a posição exata das FLOWERS e zonas foi estimada pelas figuras do manual, até a conferência com o CAD oficial;
-  - nesta versão, a aliança azul não tem robôs.
+  - as faltas de contato (G402, G405 e G421) são estimadas pela física, sem árbitro: a intenção do G405 é deduzida pela direção do lançamento.
 
 ## Autor
 

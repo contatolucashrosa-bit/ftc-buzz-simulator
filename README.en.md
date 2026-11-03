@@ -46,17 +46,23 @@ Available now (milestones M0–M3):
 - **Automatic scoring** of every row of Table 10-2:
   - LEAVE, PARK, HIVE TIP (AUTO/TELEOP), CELL, FLOWER (owner + bottom NECTAR bonus) and GARDEN;
   - SWARM, POLLINATOR 1 and 2 **RANKING POINTS**.
-- **Automatic fouls**: G410 (NECTAR in a FLOWER before 1:00), with a MAJOR FOUL credited to the opponent.
+- **Automatic fouls**, with a MAJOR FOUL credited to the opponent:
+  - G410: NECTAR in a FLOWER before 1:00;
+  - G402: touching an opponent while fully on their side during AUTO;
+  - G405: launching an element out of the field, away from your own HIVE;
+  - G421: PIN against the wall or another robot for more than 3 s (plus another MAJOR every 3 s).
+- **Local second player**: the red partner can be driven by another person on the same computer (I/K drive, J/L turn, H intake, Y launch with automatic aim, U uses the FLOWER) or with a second gamepad.
 - **HUMAN PLAYER**: enters NECTAR through the LOADING ZONE, 1 per TIP or all of it with 1:00 left (G426).
 - **Natively recreated Score Overlay**: event bar, alliances, RP icons, team numbers and timer.
 - **Animated scoreboard and results**: count-up numbers with "+N", RP icons that light up when earned, a results screen with the team record and ranking position.
 - **Replay** of the last 30 s (pause menu or end of match), with 0.25× to 2× speeds and a position slider.
+- **Team robots**: export a Workshop robot as `.buzzrobot.zip` (model, measurements, mechanisms and credit) and import it on another computer.
 - **Leaderboards**: local qualification ranking (average RP, average points and high score), match history and a class ranking by JSON file (export and import).
 - **Sample autonomous routines**: LEAVE, LEAVE + PARK, or launching into the HIVE and parking.
 - **Controls**: keyboard, gamepad and touch; audience, driver, robot, top-down and free cameras.
 - **Adjustable quality** for modest school computers.
 
-Next milestones: mechanism tagging on the CAD, vision (AprilTag) and robot contact fouls. The full roadmap is in [docs/phase-1-analysis.md](docs/phase-1-analysis.md) (in Portuguese).
+Next milestones: vision (AprilTag) in the simulated SDK and mechanism tagging on the CAD. The full roadmap is in [docs/phase-1-analysis.md](docs/phase-1-analysis.md) (in Portuguese).
 
 ## Table of Contents
 
@@ -168,7 +174,7 @@ The contents of `dist/` can be published on any free static host, such as GitHub
 - **Known limitations:**
   - the mass that tips the HIVE is not in the manual; the current value is a tunable assumption;
   - the exact positions of the FLOWERS and zones were estimated from the manual's figures, until they are checked against the official CAD;
-  - in this version, the blue alliance has no robots.
+  - contact fouls (G402, G405 and G421) are estimated from physics, with no referee: G405 intent is inferred from the launch direction.
 
 ## Author
 
