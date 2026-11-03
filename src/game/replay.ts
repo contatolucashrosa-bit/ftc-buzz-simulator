@@ -14,7 +14,7 @@ export interface ReplayFrame {
   t: number;
   clockText: string;
   scores: { red: number; blue: number };
-  robot: { p: [number, number, number]; q: [number, number, number, number] };
+  robots: Array<{ p: [number, number, number]; q: [number, number, number, number] }>;
   hives: { red: number; blue: number };
   elements: Float32Array;
 }
@@ -22,7 +22,8 @@ export interface ReplayFrame {
 export interface ReplaySource {
   clockText: string;
   scores: { red: number; blue: number };
-  robot: THREE.Object3D;
+  /** Robô do jogador primeiro, depois os bots. */
+  robots: THREE.Object3D[];
   hiveAngles: { red: number; blue: number };
   elements: Array<{ id: number; kind: ElementKind; mesh: THREE.Object3D }>;
 }
@@ -46,12 +47,11 @@ export class ReplayRecorder {
       data.set([e.mesh.position.x, e.mesh.position.y, e.mesh.position.z], o + 2);
       data.set([e.mesh.quaternion.x, e.mesh.quaternion.y, e.mesh.quaternion.z, e.mesh.quaternion.w], o + 5);
     });
-    const r = source.robot;
     this.frames.push({
       t: this.time,
       clockText: source.clockText,
       scores: { ...source.scores },
-      robot: { p: [r.position.x, r.position.y, r.position.z], q: [r.quaternion.x, r.quaternion.y, r.quaternion.z, r.quaternion.w] },
+      robots: source.robots.map((r) => ({ p: [r.position.x, r.position.y, r.position.z], q: [r.quaternion.x, r.quaternion.y, r.quaternion.z, r.quaternion.w] })),
       hives: { ...source.hiveAngles },
       elements: data,
     });
@@ -68,7 +68,7 @@ export class ReplayRecorder {
 
 export interface ReplayTargets {
   scene: THREE.Scene;
-  robot: THREE.Object3D;
+  robots: THREE.Object3D[];
   setHiveAngles(angles: { red: number; blue: number }): void;
   /** Malha nova (geometria e material compartilhados) para um tipo de elemento. */
   meshFor(kind: ElementKind): THREE.Mesh;
@@ -132,9 +132,13 @@ export class ReplayPlayer {
     const b = this.frames[Math.min(i + 1, this.frames.length - 1)];
     const k = b.t > a.t ? (this.time - a.t) / (b.t - a.t) : 0;
 
-    const robot = this.targets.robot;
-    robot.position.set(...a.robot.p).lerp(new THREE.Vector3(...b.robot.p), k);
-    robot.quaternion.set(...a.robot.q).slerp(new THREE.Quaternion(...b.robot.q), k);
+    this.targets.robots.forEach((robot, i) => {
+      const ra = a.robots[i];
+      const rb = b.robots[i] ?? ra;
+      if (!ra) return;
+      robot.position.set(...ra.p).lerp(new THREE.Vector3(...rb.p), k);
+      robot.quaternion.set(...ra.q).slerp(new THREE.Quaternion(...rb.q), k);
+    });
     this.targets.setHiveAngles({ red: a.hives.red + (b.hives.red - a.hives.red) * k, blue: a.hives.blue + (b.hives.blue - a.hives.blue) * k });
 
     // posição do mesmo elemento no quadro seguinte, para interpolar

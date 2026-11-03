@@ -14,7 +14,7 @@ describe("replay", () => {
   it("guarda só os últimos segundos, a 30 quadros por segundo", () => {
     const rec = new ReplayRecorder();
     const s = scene();
-    for (let i = 0; i < 60 * 45; i++) rec.capture(1 / 60, { clockText: "1:00", scores: { red: 0, blue: 0 }, robot: s.robot, hiveAngles: { red: 0, blue: 0 }, elements: s.elements });
+    for (let i = 0; i < 60 * 45; i++) rec.capture(1 / 60, { clockText: "1:00", scores: { red: 0, blue: 0 }, robots: [s.robot], hiveAngles: { red: 0, blue: 0 }, elements: s.elements });
     const clip = rec.clip();
     expect(clip[0].t).toBe(0);
     expect(clip[clip.length - 1].t).toBeLessThanOrEqual(REPLAY_SECONDS);
@@ -28,14 +28,14 @@ describe("replay", () => {
     for (let i = 0; i <= 60; i++) {
       s.robot.position.set(i / 60, 0, 0);
       s.ball.position.set(0, i / 60, 0);
-      rec.capture(1 / 60, { clockText: "0:10", scores: { red: i, blue: 0 }, robot: s.robot, hiveAngles: { red: 0, blue: 0 }, elements: s.elements });
+      rec.capture(1 / 60, { clockText: "0:10", scores: { red: i, blue: 0 }, robots: [s.robot], hiveAngles: { red: 0, blue: 0 }, elements: s.elements });
     }
     const target = new THREE.Object3D();
     const added: THREE.Object3D[] = [];
     let live = true;
     const player = new ReplayPlayer(rec.clip(), {
       scene: { add: (o: THREE.Object3D) => added.push(o), remove: () => undefined } as unknown as THREE.Scene,
-      robot: target,
+      robots: [target],
       setHiveAngles: () => undefined,
       meshFor: () => new THREE.Mesh(),
       setLiveElementsVisible: (v) => (live = v),

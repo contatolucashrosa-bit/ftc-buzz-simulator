@@ -15,6 +15,8 @@ import { Robot, robotConfigFromPreset } from "../sim/robot";
 import { Environment } from "../render/environment";
 import { SoundBoard } from "../render/audio";
 import { ReplayPlayer, ReplayRecorder } from "./replay";
+import { BotBrain, type BotLevel, type BotWorld } from "./bot";
+import { ROBOT_PRESETS, type RobotPresetId as BotPresetId } from "../config/robotPresets";
 import { HardwareBus } from "../java/hardwareBus";
 import { GamepadSource } from "../java/gamepadSource";
 import { runProgram } from "../java/javaRuntime";
@@ -61,6 +63,33 @@ export interface JavaView {
   error: string | null;
 }
 
+export interface BotOptions {
+  /** Parceiro na aliança vermelha. */
+  partner: boolean;
+  /** Robôs na aliança azul (0 a 2). */
+  opponents: 0 | 1 | 2;
+  level: BotLevel;
+}
+
+interface BotRobot {
+  robot: Robot;
+  brain: BotBrain;
+  alliance: Alliance;
+  slot: 0 | 1;
+  label: string;
+}
+
+/** Largada dos bots (G304: tocando a parede da própria aliança, fora da LOADING ZONE). */
+const BOT_STARTS: Record<Alliance, Array<{ x: number; y: number; heading: number }>> = {
+  red: [RED_START, { x: -63, y: 2, heading: 0 }],
+  blue: [
+    { x: 63, y: 48, heading: Math.PI },
+    { x: 63, y: -2, heading: Math.PI },
+  ],
+};
+const BOT_PRESETS: BotPresetId[] = ["gobilda", "revDuo", "andymark"];
+const BOT_NECTAR_INTERVAL_S = 4;
+
 export interface GameOptions {
   mode: GameMode;
   quality: Quality;
@@ -75,6 +104,8 @@ export interface GameOptions {
   robotModelId?: string;
   /** Código Java da equipe (AUTO e/ou TELEOP). */
   java?: JavaSetup;
+  /** Parceiro e adversários controlados pelo simulador. */
+  bots?: BotOptions;
 }
 
 export interface FoulEntry {
@@ -112,6 +143,8 @@ export interface GameView {
   teamNumber: string;
   eventName: string;
   matchLabel: string;
+  /** Equipes de cada aliança, na ordem do placar. */
+  teams: Record<Alliance, string[]>;
   /** OpMode Java em execução (telemetria para o HUD). */
   java: JavaView | null;
   /** Replay em andamento (o jogo fica parado enquanto isso). */
@@ -149,6 +182,8 @@ export class Game {
   private readonly hives: Record<Alliance, Hive>;
   private readonly flowers: Flower[];
   private readonly robot: Robot;
+  private readonly bots: BotRobot[] = [];
+  private botNectarTimer = 0;
   private readonly environment: Environment;
   private readonly controls = new Controls();
   private readonly auto: AutoRunner;
@@ -173,7 +208,7 @@ export class Game {
     red: { staged: 5, introducedFromStaging: 0, returned: 0 },
     blue: { staged: 5, introducedFromStaging: 0, returned: 0 },
   };
-  private autoResult: { leave: boolean; park: boolean } | null = null;
+  private autoResult: Record<Alliance, { leave: [boolean, boolean]; park: [boolean, boolean] }> | null = null;
   private readonly fouls: FoulEntry[] = [];
   private readonly messages: Array<{ text: string; until: number }> = [];
   private finalScore: MatchScore | null = null;
@@ -225,6 +260,7 @@ export class Game {
       cad?.model,
     );
     this.robot.onLaunch = () => this.sound.launch(this.pan(this.robot.group.position.x));
+    this.createBots(options.bots);
     this.auto = new AutoRunner(options.mode === "match" ? buildAutoSteps(options.autoProgram) : []);
     this.stageElements();
     if (options.mode === "practice") this.started = true;
@@ -257,6 +293,17 @@ export class Game {
       give: (kind: "pollen" | "redNectar") => this.robot.hopper.push(kind),
       camera: (mode: "audience" | "driver" | "follow" | "top" | "free") => this.stage.setCamera(mode),
       skipTo: (elapsedSeconds: number) => (this.elapsed = elapsedSeconds),
+      /** Roda `seconds` de simulação de uma vez, sem esperar os quadros (testes com a aba em segundo plano). */
+      advance: (seconds: number) => {
+        const input = this.controls.poll();
+        const steps = Math.round(seconds / this.physics.dt);
+        for (let i = 0; i < steps && !this.finished; i++) this.fixedStep(this.physics.dt, input, false, false, false);
+        this.elements.sync();
+        this.robot.sync();
+        for (const bot of this.bots) bot.robot.sync(false);
+        for (const hive of Object.values(this.hives)) hive.syncVisual();
+      },
+      bots: () => this.bots.map((b) => ({ label: b.label, alliance: b.alliance, state: b.brain.currentState, hopper: b.robot.hopper.length, ...b.robot.pose() })),
       followOrbit: () => ({ ...this.stage.followOrbit }),
       sleeping: () => this.elements.elements.map((e) => e.body.isSleeping()),
       wakeAll: () => this.elements.elements.forEach((e) => e.body.wakeUp()),
@@ -380,10 +427,13 @@ export class Game {
         this.elements.spawn(nectarOf(alliance), p.x, p.y, p.z);
       }
     }
-    // Pré-carga do nosso robô: 4 POLLEN no depósito (G304.G)
-    this.robot.hopper.push("pollen", "pollen", "pollen", "pollen");
+    // Pré-carga: 4 POLLEN no depósito de cada robô (G304.G)
+    for (const robot of [this.robot, ...this.bots.map((b) => b.robot)]) robot.hopper.push("pollen", "pollen", "pollen", "pollen");
     // Robôs ausentes: POLLEN no centro da LOADING ZONE, contra a parede (§10.3.1)
-    const absent: Array<[Alliance, number]> = [["red", 1], ["blue", 2]];
+    const absent: Array<[Alliance, number]> = [
+      ["red", 2 - this.robotsOf("red").length],
+      ["blue", 2 - this.robotsOf("blue").length],
+    ];
     for (const [alliance, robots] of absent) {
       const lz = LOADING_ZONES[alliance];
       const wallX = alliance === "red" ? lz.xMin + rp + 0.1 : lz.xMax - rp - 0.1;
@@ -395,6 +445,74 @@ export class Game {
         }
       }
     }
+  }
+
+  private createBots(options?: BotOptions): void {
+    if (!options) return;
+    const wanted: Array<[Alliance, 0 | 1]> = [];
+    if (options.partner) wanted.push(["red", 1]);
+    for (let i = 0; i < options.opponents; i++) wanted.push(["blue", i as 0 | 1]);
+    wanted.forEach(([alliance, slot], i) => {
+      const preset = ROBOT_PRESETS[BOT_PRESETS[i % BOT_PRESETS.length]];
+      const label = `BOT ${i + 1}`;
+      const robot = new Robot(
+        { ...robotConfigFromPreset(preset), alliance, teamNumber: label, start: BOT_STARTS[alliance][slot] },
+        this.physics,
+        this.stage.scene,
+      );
+      robot.onLaunch = () => this.sound.launch(this.pan(robot.group.position.x));
+      this.bots.push({ robot, brain: new BotBrain(alliance, options.level), alliance, slot, label });
+    });
+  }
+
+  /** O que um bot enxerga: elementos soltos, a própria HIVE e os outros robôs. */
+  private botWorld(bot: BotRobot, clock: ClockState, enabled: boolean): BotWorld {
+    const robot = bot.robot;
+    const all = [this.robot, ...this.bots.map((b) => b.robot)];
+    return {
+      pose: () => robot.pose(),
+      hopperCount: () => robot.hopper.length,
+      pickups: () =>
+        this.elements.elements
+          .filter((e) => e.kind === "pollen" || allianceOfNectar(e.kind) === bot.alliance)
+          .map((e) => ({ id: e.id, ...this.elements.position(e) })),
+      hiveUpSide: () => this.hives[bot.alliance].logic.upSide,
+      launchExit: () => robot.launchExitInfo,
+      setAim: (speed, pitch) => {
+        robot.launcherSpeed = speed;
+        robot.launcherPitchDeg = pitch;
+      },
+      startBurst: () => robot.startBurst(enabled),
+      bursting: () => robot.bursting,
+      others: () => all.filter((r) => r !== robot).map((r) => r.pose()),
+      allies: () => this.robotsOf(bot.alliance).filter((r) => r !== robot).map((r) => r.pose()),
+      secondsLeft: () => (this.options.mode === "practice" ? Infinity : clock.matchSecondsRemaining),
+    };
+  }
+
+  private stepBots(dt: number, clock: ClockState, enabled: boolean): void {
+    for (const bot of this.bots) {
+      const out = enabled ? bot.brain.update(dt, this.botWorld(bot, clock, enabled)) : { drive: { forward: 0, strafe: 0, turn: 0 }, intake: false };
+      bot.robot.intakeOn = out.intake;
+      bot.robot.drive(out.drive, dt, enabled);
+      bot.robot.updateBurst(this.elements, enabled);
+      bot.robot.updateIntake(this.elements, enabled);
+    }
+    // HUMAN PLAYER azul (do simulador) entrega NECTAR quando a regra libera
+    if (this.bots.some((b) => b.alliance === "blue")) {
+      this.botNectarTimer -= dt;
+      if (this.botNectarTimer <= 0 && this.nectarAvailable("blue", clock) > 0 && clock.phase !== "pre" && clock.phase !== "post") {
+        this.botNectarTimer = BOT_NECTAR_INTERVAL_S;
+        this.introduceNectar("blue", clock, true);
+      }
+    }
+  }
+
+  /** Robôs de cada aliança na ordem do placar (vermelho 1 = jogador). */
+  private robotsOf(alliance: Alliance): Robot[] {
+    const list: Robot[] = alliance === "red" ? [this.robot] : [];
+    for (const bot of [...this.bots].sort((a, b) => a.slot - b.slot)) if (bot.alliance === alliance) list.push(bot.robot);
+    return list;
   }
 
   startMatch(): void {
@@ -478,6 +596,7 @@ export class Game {
       this.elements.sync();
       for (const hit of this.elements.takeImpacts()) this.sound.impact(hit.kind === "pollen" ? "pollen" : "nectar", hit.strength, this.pan(hit.x));
       this.robot.sync(this.clock().driverControl || this.options.mode === "practice");
+      for (const bot of this.bots) bot.robot.sync(false);
       for (const hive of Object.values(this.hives)) hive.syncVisual();
       if (this.started && !this.paused && !this.finished) this.recordFrame(realDt);
     }
@@ -637,6 +756,7 @@ export class Game {
       this.robot.intakeOn = false;
     }
     this.robot.drive(command, dt, before.robotsEnabled && matchRunning);
+    this.stepBots(dt, before, this.options.mode === "practice" ? true : enabled);
     this.robot.updateBurst(this.elements, before.robotsEnabled && matchRunning);
     this.robot.updateIntake(this.elements, before.robotsEnabled && matchRunning);
 
@@ -662,7 +782,7 @@ export class Game {
     if (this.options.mode === "match") {
       if (before.phase === "auto" && after.phase !== "auto") {
         // LEAVE e PARK do AUTO são avaliados no fim do AUTO (§10.5.F)
-        this.autoResult = { leave: !this.robot.touchingWall(), park: this.robot.partiallyIn(LOADING_ZONES.red) };
+        this.autoResult = this.leaveAndPark();
         this.flash("Fim do AUTO: robôs parados por 8 s (G403)");
       }
       if (before.phase === "transition" && after.phase === "teleop") this.flash("TELEOP: pilotos no controle!");
@@ -705,10 +825,11 @@ export class Game {
   }
 
   /** HUMAN PLAYER introduz NECTAR pela LOADING ZONE (G426, G427). */
-  private introduceNectar(alliance: Alliance, clock: ClockState): void {
+  /** `quiet`: HUMAN PLAYER do simulador (aliança dos bots), sem avisos na tela. */
+  private introduceNectar(alliance: Alliance, clock: ClockState, quiet = false): void {
     const pool = this.pools[alliance];
     if (this.nectarAvailable(alliance, clock) <= 0) {
-      this.flash("Ainda não há NECTAR liberado (G426: 1 por TIP da sua HIVE, ou todos com 1:00 restante)");
+      if (!quiet) this.flash("Ainda não há NECTAR liberado (G426: 1 por TIP da sua HIVE, ou todos com 1:00 restante)");
       return;
     }
     if (pool.returned > 0) pool.returned--;
@@ -722,9 +843,9 @@ export class Game {
     this.environment.requestNectar(alliance, () => {
       if (this.finished) return;
       this.elements.spawn(nectarOf(alliance), x, (lz.yMin + lz.yMax) / 2, 8);
-      this.flash("NECTAR introduzido na LOADING ZONE");
+      if (!quiet) this.flash("NECTAR introduzido na LOADING ZONE");
     });
-    this.flash("HUMAN PLAYER buscando um NECTAR");
+    if (!quiet) this.flash("HUMAN PLAYER buscando um NECTAR");
   }
 
   /** G410: NECTAR no volume da FLOWER antes de 1:00 restante → MAJOR FOUL por NECTAR. */
@@ -786,18 +907,32 @@ export class Game {
       a.majorFouls = this.fouls.filter((f) => f.alliance === alliance && f.penalty === "major").length;
       a.minorFouls = this.fouls.filter((f) => f.alliance === alliance && f.penalty === "minor").length;
     }
+    const now = this.leaveAndPark();
     if (this.options.mode === "match") {
-      const autoNow = clock.phase === "auto" ? { leave: !this.robot.touchingWall(), park: this.robot.partiallyIn(LOADING_ZONES.red) } : this.autoResult;
-      if (autoNow) {
-        s.red.autoLeave = [autoNow.leave, false];
-        s.red.autoPark = [autoNow.park, false];
+      const autoNow = clock.phase === "auto" ? now : this.autoResult;
+      for (const alliance of ["red", "blue"] as const) {
+        if (autoNow) {
+          s[alliance].autoLeave = autoNow[alliance].leave;
+          s[alliance].autoPark = autoNow[alliance].park;
+        }
+        if (clock.phase === "teleop" || clock.phase === "post") s[alliance].teleopPark = now[alliance].park;
       }
-      if (clock.phase === "teleop" || clock.phase === "post") s.red.teleopPark = [this.robot.partiallyIn(LOADING_ZONES.red), false];
     } else {
-      s.red.teleopPark = [this.robot.partiallyIn(LOADING_ZONES.red), false];
+      s.red.teleopPark = now.red.park;
+      s.blue.teleopPark = now.blue.park;
     }
     for (const flower of this.flowers) s.flowers[flower.spec.id] = flower.stack(this.elements).stack;
     return s;
+  }
+
+  /** LEAVE (não toca a parede) e PARK (parcialmente na LOADING ZONE) de cada robô, por aliança. */
+  private leaveAndPark(): Record<Alliance, { leave: [boolean, boolean]; park: [boolean, boolean] }> {
+    const of = (alliance: Alliance) => {
+      const robots = this.robotsOf(alliance);
+      const pick = (f: (r: Robot) => boolean): [boolean, boolean] => [robots[0] ? f(robots[0]) : false, robots[1] ? f(robots[1]) : false];
+      return { leave: pick((r) => !r.touchingWall()), park: pick((r) => r.partiallyIn(LOADING_ZONES[alliance])) };
+    };
+    return { red: of("red"), blue: of("blue") };
   }
 
   private finish(): void {
@@ -810,7 +945,7 @@ export class Game {
     this.recorder.capture(dt, {
       clockText: this.options.mode === "practice" ? formatClock(Math.floor(this.elapsed)) : formatClock(this.clock().displaySeconds),
       scores: this.lastScores,
-      robot: this.robot.group,
+      robots: [this.robot.group, ...this.bots.map((b) => b.robot.group)],
       hiveAngles: { red: this.hives.red.logic.angle, blue: this.hives.blue.logic.angle },
       elements: this.elements.elements,
     });
@@ -824,7 +959,7 @@ export class Game {
     this.robot.setTrajectoryVisible(false);
     this.replay = new ReplayPlayer(frames, {
       scene: this.stage.scene,
-      robot: this.robot.group,
+      robots: [this.robot.group, ...this.bots.map((b) => b.robot.group)],
       setHiveAngles: (a) => {
         this.hives.red.syncVisual(a.red);
         this.hives.blue.syncVisual(a.blue);
@@ -888,6 +1023,10 @@ export class Game {
       settling: clock.phase === "post" && !this.finished,
       hiveRect: this.stage.screenRect(HIVE_POINTS),
       teamNumber: this.options.teamNumber,
+      teams: {
+        red: [this.options.teamNumber, ...this.bots.filter((b) => b.alliance === "red").map((b) => b.label)],
+        blue: this.bots.filter((b) => b.alliance === "blue").sort((a, b) => a.slot - b.slot).map((b) => b.label),
+      },
       eventName: this.options.eventName,
       matchLabel: this.options.matchLabel,
       java: this.javaView(),

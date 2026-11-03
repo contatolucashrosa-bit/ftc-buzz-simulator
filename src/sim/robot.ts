@@ -516,6 +516,11 @@ export class Robot {
     return kind;
   }
 
+  /** Saída do lançador (pol à frente do centro e altura), para quem calcula a mira. */
+  get launchExitInfo(): { forward: number; z: number } {
+    return { ...this.launchExit };
+  }
+
   setTrajectoryVisible(visible: boolean): void {
     this.trajectory.visible = visible;
   }
