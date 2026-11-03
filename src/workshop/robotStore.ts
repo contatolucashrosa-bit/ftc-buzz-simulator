@@ -2,6 +2,7 @@
 // Robôs importados na Oficina, guardados no IndexedDB deste aparelho (nada sai do computador).
 // Módulo leve, sem Three.js: a tela "Jogar" só precisa da lista.
 import type { RobotPresetId } from "../config/robotPresets";
+import { tx } from "./db";
 
 export interface StoredRobotMeta {
   id: string;
@@ -20,30 +21,10 @@ export interface StoredRobot extends StoredRobotMeta {
   glb: ArrayBuffer;
 }
 
-const DB = "buzz-simulator";
 const STORE = "robots";
-
-function open(): Promise<IDBDatabase> {
-  return new Promise((resolve, reject) => {
-    const request = indexedDB.open(DB, 1);
-    request.onupgradeneeded = () => request.result.createObjectStore(STORE, { keyPath: "id" });
-    request.onsuccess = () => resolve(request.result);
-    request.onerror = () => reject(request.error);
-  });
-}
-
-async function tx<T>(mode: IDBTransactionMode, run: (store: IDBObjectStore) => IDBRequest<T>): Promise<T> {
-  const db = await open();
-  return new Promise((resolve, reject) => {
-    const request = run(db.transaction(STORE, mode).objectStore(STORE));
-    request.onsuccess = () => resolve(request.result);
-    request.onerror = () => reject(request.error);
-  });
-}
-
 export async function listRobots(): Promise<StoredRobotMeta[]> {
   try {
-    const all = await tx<StoredRobot[]>("readonly", (s) => s.getAll() as IDBRequest<StoredRobot[]>);
+    const all = await tx<StoredRobot[]>(STORE, "readonly", (s) => s.getAll() as IDBRequest<StoredRobot[]>);
     return all.map(({ glb: _glb, ...meta }) => meta).sort((a, b) => b.createdAt - a.createdAt);
   } catch {
     // IndexedDB indisponível (janela anônima em alguns navegadores): segue sem robôs importados
@@ -52,15 +33,15 @@ export async function listRobots(): Promise<StoredRobotMeta[]> {
 }
 
 export function getRobot(id: string): Promise<StoredRobot | undefined> {
-  return tx<StoredRobot | undefined>("readonly", (s) => s.get(id) as IDBRequest<StoredRobot | undefined>);
+  return tx<StoredRobot | undefined>(STORE, "readonly", (s) => s.get(id) as IDBRequest<StoredRobot | undefined>);
 }
 
 export async function saveRobot(robot: StoredRobot): Promise<void> {
-  await tx("readwrite", (s) => s.put(robot));
+  await tx(STORE, "readwrite", (s) => s.put(robot));
 }
 
 export async function deleteRobot(id: string): Promise<void> {
-  await tx("readwrite", (s) => s.delete(id));
+  await tx(STORE, "readwrite", (s) => s.delete(id));
 }
 
 /** Valor usado no seletor de robô para um modelo importado. */
