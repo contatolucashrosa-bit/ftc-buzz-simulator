@@ -4,12 +4,17 @@
 // (aceitam comandos e leem zero), para o OpMode não quebrar por causa de um mecanismo que o simulador não tem.
 import { DEVICE_NAMES, RobotHardware, type RobotActions } from "../sim/robotHardware";
 import type { DeviceKind, HardwareUse } from "./project";
+import type { CameraIntrinsics, CameraMount, TagDetection } from "../sim/vision";
 
 export interface BusInputs {
   /** Pose verdadeira no campo: mm, mm, rad; velocidades em mm/s e rad/s. */
   pose(): { x: number; y: number; h: number; vx: number; vy: number; vh: number };
   /** Campo do gamepad no formato do SDK ("left_stick_y", "a"...). */
   gamepad(index: number, field: string): number;
+  /** AprilTags vistas pela câmera montada no robô (pol, graus), e a pose verdadeira do robô (pol, rad). */
+  aprilTags?(mount: CameraMount, intrinsics: CameraIntrinsics): { detections: TagDetection[]; robot: { x: number; y: number; heading: number } };
+  /** Tags do campo na posição inicial das HIVEs: id, x, y, z (pol). */
+  tagLibrary?(): Array<{ id: number; x: number; y: number; z: number }>;
 }
 
 /** O que cada dispositivo simulado é para o SDK. */
@@ -58,7 +63,24 @@ export class HardwareBus {
       log: (text: string) => this.log(text),
       names: (kind: string) => this.names(kind),
       onNextStep: (resume: () => void) => this.waiting.push(resume),
+      aprilTags: (x: number, y: number, z: number, yaw: number, pitch: number, roll: number, fx: number, fy: number, cx: number, cy: number, width: number, height: number) =>
+        this.aprilTags({ x, y, z, yaw, pitch, roll }, { fx, fy, cx, cy, width, height }),
+      tagLibrary: () => (this.inputs.tagLibrary?.() ?? []).map((t) => [t.id, t.x, t.y, t.z].join(",")).join(";"),
     };
+  }
+
+  /**
+   * Detecções num texto simples para o Java (sem JSON no SDK): uma tag por ";" com
+   * id, x, y, z, yaw, pitch, roll, range, bearing, elevation, centro (px), tamanho (px) e a pose do robô.
+   */
+  private aprilTags(mount: CameraMount, intrinsics: CameraIntrinsics): string {
+    const seen = this.inputs.aprilTags?.(mount, intrinsics);
+    if (!seen) return "";
+    const r = seen.robot;
+    const heading = (r.heading * 180) / Math.PI;
+    return seen.detections
+      .map((d) => [d.id, d.x, d.y, d.z, d.yaw, d.pitch, d.roll, d.range, d.bearing, d.elevation, d.centerPx.x, d.centerPx.y, d.sizePx, r.x, r.y, heading].map((v) => +v.toFixed(4)).join(","))
+      .join(";");
   }
 
   install(): void {

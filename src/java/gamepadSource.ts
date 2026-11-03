@@ -38,12 +38,25 @@ const KEYS: Record<string, string> = {
   back: "Backspace",
 };
 
+/** Com um 2º jogador no teclado (I/J/K/L e H), os botões do gamepad1 vão para teclas que ele não usa. */
+const SHARED_KEYS: Record<string, string> = {
+  ...KEYS,
+  a: "Digit1",
+  b: "Digit2",
+  x: "Digit3",
+  y: "Digit4",
+  left_bumper: "KeyZ",
+  right_bumper: "KeyX",
+};
+
 export class GamepadSource {
+  private readonly keys: Record<string, string>;
   private readonly down = new Set<string>();
   private readonly onDown = (e: KeyboardEvent) => this.down.add(e.code);
   private readonly onUp = (e: KeyboardEvent) => this.down.delete(e.code);
 
-  constructor() {
+  constructor(shareKeyboard = false) {
+    this.keys = shareKeyboard ? SHARED_KEYS : KEYS;
     window.addEventListener("keydown", this.onDown);
     window.addEventListener("keyup", this.onUp);
     window.addEventListener("blur", () => this.down.clear());
@@ -94,7 +107,7 @@ export class GamepadSource {
       case "right_trigger":
         return key("KeyF");
       default:
-        return KEYS[field] ? key(KEYS[field]) : 0;
+        return this.keys[field] ? key(this.keys[field]) : 0;
     }
   }
 }

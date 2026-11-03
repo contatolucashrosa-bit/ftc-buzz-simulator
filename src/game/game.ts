@@ -16,6 +16,7 @@ import { Environment } from "../render/environment";
 import { SoundBoard } from "../render/audio";
 import { ReplayPlayer, ReplayRecorder } from "./replay";
 import { FoulMonitor, type FoulRobot } from "./fouls";
+import { detectTags, hiveTags, type CameraIntrinsics, type CameraMount } from "../sim/vision";
 import type { SecondPlayerState } from "../input/controls";
 import { BotBrain, type BotLevel, type BotWorld } from "./bot";
 import { ROBOT_PRESETS, type RobotPresetId as BotPresetId } from "../config/robotPresets";
@@ -27,7 +28,7 @@ import { getRobot } from "../workshop/robotStore";
 import { loadStoredModel } from "../workshop/cadImport";
 import type { RobotPreset } from "../config/robotPresets";
 import { robotPreset, type RobotPresetId } from "../config/robotPresets";
-import { ELEMENTS, FIELD, FLOWERS, GARDENS, HIVE, LOADING_ZONES, circleTouchesRect, toWorld, INCH } from "../sim/geometry";
+import { ELEMENTS, FIELD, FLOWERS, GARDENS, HIVE, HIVE_INITIAL_UP_SIDE, LOADING_ZONES, circleTouchesRect, toWorld, INCH } from "../sim/geometry";
 import { AutoRunner, buildAutoSteps, hiveShot, RED_START, type AutoProgramId } from "./autonomous";
 
 export type GameMode = "practice" | "match";
@@ -700,9 +701,20 @@ export class Game {
 
   private startOpMode(run: JavaOpModeRun): HardwareBus {
     const java = this.options.java!;
-    this.gamepads ??= new GamepadSource();
+    this.gamepads ??= new GamepadSource(this.bots.some((b) => b.human));
     const gamepads = this.gamepads;
-    const bus = new HardwareBus(java.deviceMap, java.hardware, { pose: () => this.lastPose, gamepad: (i, f) => gamepads.read(i, f) }, (text) => {
+    const inputs = {
+      pose: () => this.lastPose,
+      gamepad: (i: number, f: string) => gamepads.read(i, f),
+      aprilTags: (mount: CameraMount, intrinsics: CameraIntrinsics) => {
+        const robot = this.robot.pose();
+        const tags = [...hiveTags("red", this.hives.red.logic.angle), ...hiveTags("blue", this.hives.blue.logic.angle)];
+        return { detections: detectTags(robot, tags, mount, intrinsics), robot };
+      },
+      tagLibrary: () =>
+        (["red", "blue"] as const).flatMap((a) => hiveTags(a, ((HIVE.tiltDeg * Math.PI) / 180) * HIVE_INITIAL_UP_SIDE[a]).map((t) => ({ id: t.id, ...t.center }))),
+    };
+    const bus = new HardwareBus(java.deviceMap, java.hardware, inputs, (text) => {
       if (text.startsWith("OPMODE_ERROR")) this.flash(`Erro no OpMode ${run.label}: ${text.replace("OPMODE_ERROR ", "").split("\n")[0]}`, 6);
     });
     bus.install();

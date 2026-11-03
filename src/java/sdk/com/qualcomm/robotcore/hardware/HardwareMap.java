@@ -22,6 +22,9 @@ import org.buzzsim.internal.SimImu;
 import org.buzzsim.internal.SimMotor;
 import org.buzzsim.internal.SimOctoQuad;
 import org.buzzsim.internal.SimServo;
+import org.buzzsim.internal.SimWebcam;
+import org.firstinspires.ftc.robotcore.external.hardware.camera.CameraName;
+import org.firstinspires.ftc.robotcore.external.hardware.camera.WebcamName;
 
 /** Mapa de hardware do robô simulado. Os nomes vêm da configuração do robô no simulador. */
 public class HardwareMap implements Iterable<HardwareDevice> {
@@ -111,6 +114,7 @@ public class HardwareMap implements Iterable<HardwareDevice> {
         String kind = Hw.kind(name);
         if (type == LynxModule.class) return hub;
         if (type == VoltageSensor.class) return SimDevices.voltage();
+        if (type == WebcamName.class || type == CameraName.class) return new SimWebcam(name);
         if (kind.isEmpty()) return null;
         if (isMotorType(type) || type == HardwareDevice.class && kind.equals("motor")) {
             if (!kind.equals("motor")) return null;

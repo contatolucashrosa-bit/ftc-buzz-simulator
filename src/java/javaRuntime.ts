@@ -6,7 +6,7 @@ import type { CompileMessage, CompileRequest } from "./compileWorker";
 import type { JavaProject, OpModeInfo } from "./project";
 
 /** Muda quando o SDK simulado ou as bibliotecas mudam, para não reaproveitar compilações antigas. */
-const RUNTIME_VERSION = "sdk-2026.11-1";
+const RUNTIME_VERSION = "sdk-2026.11-2";
 
 export type CompileResult = { ok: true; js: string; cached: boolean; ms: number } | { ok: false; errors: string[] };
 

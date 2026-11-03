@@ -38,6 +38,16 @@ public final class Hw {
     @JSBody(params = {"text"}, script = "globalThis.__buzzHw.log(text);")
     public static native void log(String text);
 
+    /** AprilTags vistas pela câmera montada (pol, graus), uma por ";" (ver hardwareBus.ts). */
+    @JSBody(params = {"x", "y", "z", "yaw", "pitch", "roll", "fx", "fy", "cx", "cy", "width", "height"},
+            script = "return globalThis.__buzzHw.aprilTags(x, y, z, yaw, pitch, roll, fx, fy, cx, cy, width, height);")
+    public static native String aprilTags(double x, double y, double z, double yaw, double pitch, double roll,
+                                          double fx, double fy, double cx, double cy, int width, int height);
+
+    /** Tags do campo: "id,x,y,z" separadas por ";" (pol). */
+    @JSBody(script = "return globalThis.__buzzHw.tagLibrary();")
+    public static native String tagLibrary();
+
     /** Nomes configurados de um tipo, separados por vírgula. */
     @JSBody(params = {"kind"}, script = "return globalThis.__buzzHw.names(kind);")
     public static native String names(String kind);
