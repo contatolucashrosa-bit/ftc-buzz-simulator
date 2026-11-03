@@ -71,6 +71,7 @@ A fonte da verdade das regras é o manual oficial *BIOBUZZ Competition Manual*, 
 - **Robôs-bot:** parceiro e até 2 adversários (fácil, médio ou difícil), com HUMAN PLAYER azul automático.
 - **2º jogador local:** o parceiro vermelho pode ser pilotado por outra pessoa no mesmo computador ou pelo 2º controle.
 - **Código Java do Android Studio na partida:** importe o TeamCode (pasta ou `.zip`) sem mudar nada, com Pedro Pathing e RoadRunner; INIT, START e STOP seguem a partida, com telemetria no HUD e erros de compilação em português.
+- **Visão com AprilTag:** `VisionPortal` e `AprilTagProcessor` do SDK funcionam com a câmera simulada do robô. As tags 30–45 ficam sob as CELLS e acompanham a inclinação da HIVE; `ftcPose`, `robotPose` e `metadata` vêm como no robô real.
 - **Oficina de CAD:** importa GLB, STL e STEP (até 40 MB no navegador), orienta o modelo, confere o R102 e guarda no aparelho.
 - **Robôs da equipe:** exporta e importa robôs como `.buzzrobot.zip`, com modelo, medidas, mecanismos e crédito.
 - **Score Overlay** recriado, placar animado, tela de resultado, **replay** dos últimos 30 s e **ranking** local exportável.
@@ -194,7 +195,7 @@ Na tela **Jogar** a equipe escolhe número, evento, robô, programa do AUTO (de 
 | Placar: transmissão → piloto → oculto | V | — |
 | Câmera "Seguir robô": girar / inclinar / aproximar | arrastar o mouse / roda / duplo clique volta ao padrão | analógico direito ↕ inclina; R3 + ↔ gira |
 
-**Controles do 2º jogador:** I/K anda, J/L gira, H coleta, Y lança (mira automática na CELL de cima), U usa a FLOWER. Ou o 2º controle conectado.
+**Controles do 2º jogador:** I/K anda, J/L gira, H coleta, Y lança (mira automática na CELL de cima), U usa a FLOWER. Ou o 2º controle conectado. Com 2º jogador e TeleOp em Java, os botões A/B/X/Y do gamepad1 no teclado passam para 1/2/3/4, e LB/RB para Z/X.
 
 ---
 
@@ -259,7 +260,7 @@ O conteúdo de `dist/` é um site estático e pode ser publicado em qualquer hos
   - a massa que faz a HIVE virar não consta no manual; o valor atual é uma suposição calibrável;
   - a posição exata das FLOWERS e zonas foi estimada pelas figuras do manual, até a conferência com o CAD oficial;
   - as faltas de contato são estimadas pela física, sem árbitro: a intenção do G405 é deduzida pela direção do lançamento;
-  - visão (AprilTag) ainda não existe no SDK Java simulado.
+  - a visão é geométrica: a câmera vê as tags pelo campo de visão, distância (até 12 pés) e ângulo, sem oclusão por robôs ou elementos e sem ruído; Limelight e processadores próprios (OpenCV) ainda não existem.
 - O diretório `dist/` é gerado pelo build e não deve ser versionado.
 
 Documentação detalhada: [roadmap](docs/phase-1-analysis.md) · [Java](docs/m5a-java-runtime.md) · [CAD](docs/cad-import.md) · [starter bots](docs/starter-bots.md) · [robôs-bot](docs/bots.md).

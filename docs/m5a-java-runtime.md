@@ -55,7 +55,7 @@ flowchart LR
 2. **Tempo de tradução:** 3 a 7,5 s neste PC, e mais em Chromebook. Mitigação no M5:
    - traduzir num Web Worker, com barra de progresso;
    - guardar o resultado no IndexedDB, para recompilar só quando o código mudar.
-3. **Visão** (AprilTag, VisionPortal, Limelight, câmeras) ainda não existe no SDK simulado → M7.
+3. **Visão:** AprilTag e `VisionPortal` existem desde o M7 (ver "Visão com AprilTag" abaixo). Limelight e processadores próprios com OpenCV ainda não.
 4. **Kotlin no código da equipe:** não é suportado, porque não há compilador Kotlin offline no navegador. Bibliotecas Kotlin já compiladas, como o RoadRunner, funcionam.
 5. **Tuners do Pedro** (AutoTune com servidor web) não se aplicam ao simulador. O plano é oferecer constantes já ajustadas para o robô simulado.
 6. **Navegador:** o compilador usa WasmGC (Chrome/Edge 119+, Firefox 120+, Safari 18.2+). Em navegadores mais antigos, a biblioteca cai automaticamente no `compiler.js`.
@@ -120,5 +120,31 @@ No treino livre, o TeleOp começa direto.
 - H/G: bumpers; I J K L: Y X A B.
 
 **Tempos medidos:** cerca de 3,5 s por OpMode no servidor de desenvolvimento e 1,9 s no build de produção. Da segunda vez, vem do cache e abre na hora. O laço Java gasta cerca de 1,4 ms por segundo de jogo.
+
+## Visão com AprilTag (M7)
+
+O `VisionPortal` e o `AprilTagProcessor` do SDK funcionam sem mudar o código. Qualquer `WebcamName` ("Webcam 1"...) é a câmera do robô simulado.
+
+**Como a detecção funciona:** não há imagem. A cada quadro (30 fps), `src/sim/vision.ts` calcula onde cada tag aparece numa câmera "pinhole" (Logitech C920 a 640 × 480, `fx = fy = 622`). Uma tag é detectada quando cumpre três condições:
+- está inteira dentro da imagem;
+- está a até 144 pol;
+- está virada para a câmera, com no máximo 70° de inclinação.
+
+**Tags do campo:** IDs 30–45 (36h11, 3,25 pol), 4 por CELL, na face de baixo, a 4,25 pol de centro a centro (tira do CAD am-5888). Elas acompanham a inclinação da HIVE: depois de um TIP, as tags de cima e de baixo trocam de altura. A ordem dos IDs ao longo da CELL é suposição até a conferência com o CAD oficial.
+
+**O que vem em cada detecção:**
+
+| Campo | Conteúdo |
+|---|---|
+| `ftcPose` | x, y, z, yaw, pitch, roll, range, bearing e elevation, nas unidades de `setOutputUnits` (padrão: polegadas e graus) |
+| `metadata` | Nome ("Red HIVE audience 2"), tamanho e posição no campo com as HIVEs na largada. Tags fora da biblioteca vêm sem pose, como no SDK |
+| `robotPose` | A pose verdadeira do robô no referencial do simulador (x, y em pol; yaw 0 = +x) |
+| `center` | Centro em pixels |
+
+**Montagem da câmera:** vem de `setCameraPose(Position, YawPitchRollAngles)`, na convenção do SDK (pitch -90 = horizontal para a frente). Sem ela, a câmera fica na frente do robô, a 8 pol do chão e inclinada 25° para cima, porque as tags ficam no alto (CELL de cima a ~50 pol).
+
+**Exemplo:** `examples/TeamCode/.../ExemploAprilTag.java` gira até achar a própria HIVE e para a 50 pol, só pela câmera. Na partida, ele achou as tags 34–37 em menos de 1 s e parou a ~51 pol.
+
+**Limitações:** sem oclusão (robôs, elementos e a estrutura da HIVE não tapam a visão) e sem ruído ou borrão. Exposição e ganho são aceitos e ignorados. Não há imagem ao vivo nem Limelight.
 
 **Limitação nova:** dois arquivos `.java` com o mesmo nome em pacotes diferentes ainda não compilam juntos, porque o javac do navegador confere o nome do arquivo sem as pastas.

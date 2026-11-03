@@ -462,6 +462,8 @@ M4 concluído em 03/11/2026: G402, G405 e G421 são detectadas pela física. G42
 
 **M5a concluído:** TeamCode real (SDK, Pedro Pathing 3.0.2 e o Quickstart inteiro do RoadRunner) compila e roda no navegador sem alterações. Detalhes, medições e limitações em [m5a-java-runtime.md](m5a-java-runtime.md). Próximo: **M5** (integrar o runtime Java ao jogo).
 
+**M7 em andamento (03/11/2026):** AprilTag simulada (IDs 30–45) com `VisionPortal` e `AprilTagProcessor`; o autônomo de exemplo se localiza pela tag. A importação de STEP já existe desde a Oficina (M6/M11).
+
 | Marco | Entrega | Como testar |
 |---|---|---|
 | **M0 — Fundação** | Repositório (Vite + TS, ESLint, Vitest, CI), README pt/en, LICENSE MIT, schema do `rules.json`, **motor de pontuação puro** | `npm test`: um teste por linha da Tab. 10-2, RP e faltas G410/G426 |
