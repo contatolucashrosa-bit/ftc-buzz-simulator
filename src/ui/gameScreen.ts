@@ -6,6 +6,8 @@ import { ICON_POLLINATOR, ICON_ROBOT, ICON_SWARM } from "./icons";
 import { escapeHtml } from "./dom";
 import { robotPreset } from "../config/robotPresets";
 import type { AllianceScore } from "../scoring/scoring";
+import { previousBest, rankTeams, recordFromScore, saveRecord } from "../match/history";
+import { REPLAY_SECONDS } from "../game/replay";
 
 export type OverlayMode = "broadcast" | "driver" | "hidden";
 export type OverlayScale = 0.5 | 0.75 | 1;
@@ -53,6 +55,7 @@ function rectsOverlap(a: { left: number; top: number; right: number; bottom: num
 
 export interface GameScreenActions {
   exitToHome(): void;
+  openRanking(): void;
   restart(options: GameOptions): void;
 }
 
@@ -66,6 +69,57 @@ function bonusHtml(score: AllianceScore): string {
     icon(score.pollinator1.achieved, ICON_POLLINATOR(1), "POLLINATOR 1 RP (4 TIPs)", `${score.pollinator1.progress}/${score.pollinator1.threshold}`),
     icon(score.pollinator2.achieved, ICON_POLLINATOR(2), "POLLINATOR 2 RP (7 TIPs)", `${score.pollinator2.progress}/${score.pollinator2.threshold}`),
   ].join("");
+}
+
+/**
+ * Número do placar que sobe contando (como nas transmissões) e mostra "+N" ao pontuar.
+ * Quedas (ex.: reinício) aparecem na hora, sem animação.
+ */
+class ScoreCounter {
+  private shown = 0;
+  private target = 0;
+  private from = 0;
+  private start = 0;
+  private raf = 0;
+
+  constructor(private readonly el: HTMLElement) {
+    el.textContent = "0";
+  }
+
+  set(value: number): void {
+    if (value === this.target) return;
+    const gain = value - this.target;
+    this.target = value;
+    if (gain < 0) {
+      cancelAnimationFrame(this.raf);
+      this.shown = value;
+      this.el.textContent = String(value);
+      return;
+    }
+    this.from = this.shown;
+    this.start = performance.now();
+    this.el.classList.remove("bump");
+    void this.el.offsetWidth; // reinicia a animação CSS
+    this.el.classList.add("bump");
+    const chip = document.createElement("span");
+    chip.className = "ov-gain";
+    chip.textContent = `+${gain}`;
+    this.el.parentElement?.appendChild(chip);
+    setTimeout(() => chip.remove(), 1200);
+    cancelAnimationFrame(this.raf);
+    const tick = () => {
+      const k = Math.min(1, (performance.now() - this.start) / 600);
+      const eased = 1 - Math.pow(1 - k, 3);
+      this.shown = Math.round(this.from + (this.target - this.from) * eased);
+      this.el.textContent = String(this.shown);
+      if (k < 1) this.raf = requestAnimationFrame(tick);
+    };
+    this.raf = requestAnimationFrame(tick);
+  }
+
+  dispose(): void {
+    cancelAnimationFrame(this.raf);
+  }
 }
 
 function resultRows(view: GameView): string {
@@ -180,6 +234,15 @@ export async function mountGameScreen(root: HTMLElement, options: GameOptions, a
         </div>
         <div class="stick" data-stick="turn" aria-label="Girar"><div class="knob"></div></div>
       </div>
+      <div class="replay-bar" data-replay hidden>
+        <span class="replay-tag">REPLAY</span>
+        <button type="button" data-rp="toggle" aria-label="Pausar ou continuar">❚❚</button>
+        <button type="button" data-rp="restart" aria-label="Do começo">⟲</button>
+        <input type="range" min="0" max="1000" value="0" data-rp="seek" aria-label="Posição do replay">
+        <span class="replay-time" data-rp-time>0,0 s</span>
+        <span class="replay-speed">${[0.25, 0.5, 1, 2].map((v) => `<button type="button" data-rp-speed="${v}">${String(v).replace(".", ",")}×</button>`).join("")}</span>
+        <button type="button" class="replay-exit" data-rp="exit">Sair do replay</button>
+      </div>
       <div data-modal></div>
     </div>`;
 
@@ -205,10 +268,12 @@ export async function mountGameScreen(root: HTMLElement, options: GameOptions, a
       `<h2>Pausado</h2><p>A física e o relógio estão parados.</p>
        <div class="actions">
          <button class="btn btn-primary" data-m="resume">Continuar</button>
+         <button class="btn btn-secondary" data-m="replay">Replay (últimos ${REPLAY_SECONDS} s)</button>
          <button class="btn btn-secondary" data-m="restart">Reiniciar</button>
          <button class="btn btn-secondary" data-m="exit">Sair para o início</button>
        </div>`,
       (el) => {
+        el.querySelector('[data-m="replay"]')!.addEventListener("click", () => openReplay(pauseMenu));
         el.querySelector('[data-m="resume"]')!.addEventListener("click", () => {
           closeModal();
           game?.setPaused(false);
@@ -239,22 +304,69 @@ export async function mountGameScreen(root: HTMLElement, options: GameOptions, a
 
   const onFinished = (view: GameView) => {
     recordMatchPlayed();
-    const r = view.score.red.total;
-    const b = view.score.blue.total;
-    const headline = r > b ? "Vitória da aliança vermelha!" : r < b ? "Vitória da aliança azul" : "Empate";
-    showModal(
-      `<h2>${headline}</h2>${resultRows(view)}
-       ${view.fouls.length ? `<h3>Faltas</h3><ul>${view.fouls.map((f) => `<li>${f.clock} — ${f.rule}: ${escapeHtml(f.text)} (${f.penalty === "major" ? "MAJOR" : "MINOR"}, ${f.alliance === "red" ? "vermelha" : "azul"})</li>`).join("")}</ul>` : ""}
-       <div class="actions">
-         <button class="btn btn-primary" data-m="again">Jogar de novo</button>
-         <button class="btn btn-secondary" data-m="exit">Início</button>
-       </div>`,
-      (el) => {
-        el.querySelector('[data-m="again"]')!.addEventListener("click", () => actions.restart(options));
-        el.querySelector('[data-m="exit"]')!.addEventListener("click", () => actions.exitToHome());
-      },
-    );
+    // a equipe do jogador é a aliança vermelha (treino solo)
+    const record = recordFromScore(view.score.red, { team: options.teamNumber, eventName: options.eventName, robot: robot.label, autoProgram: options.autoProgram });
+    const history = saveRecord(record);
+    const best = previousBest(history, options.teamNumber, record.id);
+    const ranking = rankTeams(history);
+    const position = ranking.find((r) => r.team === options.teamNumber);
+    const showResults = () => {
+      const r = view.score.red;
+      const b = view.score.blue;
+      const headline = r.total > b.total ? "Vitória da aliança vermelha!" : r.total < b.total ? "Vitória da aliança azul" : "Empate";
+      const earned = [r.swarm.achieved && "SWARM", r.pollinator1.achieved && "POLLINATOR 1", r.pollinator2.achieved && "POLLINATOR 2", r.result === "win" && "Vitória (3)", r.result === "tie" && "Empate (1)"].filter(Boolean);
+      showModal(
+        `<div class="result-hero">
+           <div class="rh-alliance red"><span>Vermelha · ${escapeHtml(options.teamNumber)}</span><strong>${r.total}</strong></div>
+           <div class="rh-center"><h2>${headline}</h2>${best === null || r.total > best ? `<span class="rh-record">${best === null ? "Primeira partida registrada" : `Novo recorde! (antes: ${best})`}</span>` : `<span class="rh-sub">Recorde da equipe: ${best}</span>`}</div>
+           <div class="rh-alliance blue"><span>Azul</span><strong>${b.total}</strong></div>
+         </div>
+         <div class="rh-rp"><div class="ov-bonus">${bonusHtml(r)}</div><span><strong>${r.rankingPoints} RP</strong> ${earned.length ? escapeHtml(earned.join(" · ")) : "nenhum RP nesta partida"}</span></div>
+         ${resultRows(view)}
+         ${view.fouls.length ? `<h3>Faltas</h3><ul>${view.fouls.map((f) => `<li>${f.clock} — ${f.rule}: ${escapeHtml(f.text)} (${f.penalty === "major" ? "MAJOR" : "MINOR"}, ${f.alliance === "red" ? "vermelha" : "azul"})</li>`).join("")}</ul>` : ""}
+         ${position ? `<p class="rh-rank">Ranking de qualificação deste aparelho: <strong>${position.rank}º de ${ranking.length}</strong> · Ranking Score ${position.rankingScore.toFixed(2).replace(".", ",")} em ${position.matches} partida(s).</p>` : ""}
+         <div class="actions">
+           <button class="btn btn-primary" data-m="again">Jogar de novo</button>
+           <button class="btn btn-secondary" data-m="replay">Ver replay (${REPLAY_SECONDS} s)</button>
+           <button class="btn btn-secondary" data-m="ranking">Ranking</button>
+           <button class="btn btn-secondary" data-m="exit">Início</button>
+         </div>`,
+        (el) => {
+          el.querySelector('[data-m="again"]')!.addEventListener("click", () => actions.restart(options));
+          el.querySelector('[data-m="replay"]')!.addEventListener("click", () => openReplay(showResults));
+          el.querySelector('[data-m="ranking"]')!.addEventListener("click", () => actions.openRanking());
+          el.querySelector('[data-m="exit"]')!.addEventListener("click", () => actions.exitToHome());
+        },
+      );
+    };
+    showResults();
   };
+
+  // Replay: barra de controle; ao sair, volta para a tela de onde veio (resultado ou pausa)
+  const replayBar = q("[data-replay]");
+  let afterReplay: (() => void) | null = null;
+  const openReplay = (back: () => void) => {
+    if (!game?.startReplay()) {
+      showToast("Ainda não há o que reproduzir: jogue alguns segundos primeiro.");
+      return;
+    }
+    closeModal();
+    afterReplay = back;
+    replayBar.hidden = false;
+  };
+  const closeReplay = () => {
+    game?.stopReplay();
+    replayBar.hidden = true;
+    const back = afterReplay;
+    afterReplay = null;
+    back?.();
+  };
+  replayBar.querySelector('[data-rp="toggle"]')!.addEventListener("click", () => game?.replayControl({ toggle: true }));
+  replayBar.querySelector('[data-rp="restart"]')!.addEventListener("click", () => game?.replayControl({ restart: true }));
+  replayBar.querySelector('[data-rp="exit"]')!.addEventListener("click", closeReplay);
+  const seek = replayBar.querySelector<HTMLInputElement>('[data-rp="seek"]')!;
+  seek.addEventListener("input", () => game?.replayControl({ seek: Number(seek.value) / 1000 }));
+  replayBar.querySelectorAll<HTMLButtonElement>("[data-rp-speed]").forEach((b) => b.addEventListener("click", () => game?.replayControl({ speed: Number(b.dataset.rpSpeed) })));
 
   // Placar: modo, escala e transparência automática sobre a HIVE
   const overlayEl = q("[data-overlay]");
@@ -302,12 +414,41 @@ export async function mountGameScreen(root: HTMLElement, options: GameOptions, a
 
   const toastArea = q(".toast-area");
   let lastToasts = "";
+  let localToast: { text: string; until: number } | null = null;
+  const showToast = (text: string) => {
+    localToast = { text, until: performance.now() + 2500 };
+    lastToasts = "";
+  };
+  const counters = { red: new ScoreCounter(q('[data-score="red"]')), blue: new ScoreCounter(q('[data-score="blue"]')) };
+  const rpState = { red: "", blue: "" };
   const onView = (view: GameView) => {
     const { red, blue } = view.score;
-    q('[data-score="red"]').textContent = String(red.total);
-    q('[data-score="blue"]').textContent = String(blue.total);
-    q('[data-bonus="red"]').innerHTML = bonusHtml(red);
-    q('[data-bonus="blue"]').innerHTML = bonusHtml(blue);
+    counters.red.set(red.total);
+    counters.blue.set(blue.total);
+    for (const [alliance, score] of [["red", red], ["blue", blue]] as const) {
+      // ícone de RP acende com animação na hora em que é conquistado
+      const key = [score.swarm.achieved, score.pollinator1.achieved, score.pollinator2.achieved].map(Number).join("");
+      const el = q(`[data-bonus="${alliance}"]`);
+      el.innerHTML = bonusHtml(score);
+      if (rpState[alliance] && key !== rpState[alliance]) {
+        const names = ["SWARM", "POLLINATOR 1", "POLLINATOR 2"];
+        key.split("").forEach((v, i) => {
+          if (v === "1" && rpState[alliance][i] === "0") {
+            el.children[i]?.classList.add("just-earned");
+            if (alliance === "red") showToast(`RANKING POINT conquistado: ${names[i]}`);
+          }
+        });
+      }
+      rpState[alliance] = key;
+    }
+    replayBar.hidden = !view.replay;
+    if (view.replay) {
+      const rp = view.replay;
+      if (document.activeElement !== seek) seek.value = String(Math.round((rp.length ? rp.time / rp.length : 0) * 1000));
+      q("[data-rp-time]").textContent = `${rp.time.toFixed(1).replace(".", ",")} / ${rp.length.toFixed(1).replace(".", ",")} s`;
+      replayBar.querySelector('[data-rp="toggle"]')!.textContent = rp.playing ? "❚❚" : "▶";
+      replayBar.querySelectorAll<HTMLButtonElement>("[data-rp-speed]").forEach((b) => b.setAttribute("aria-pressed", String(Number(b.dataset.rpSpeed) === rp.speed)));
+    }
     q(".ov-timer").textContent = view.clockText;
     q(".ov-phase").textContent = view.settling ? "Apurando…" : view.clock.flowerUnlocked && view.mode === "match" && view.clock.phase === "teleop" ? "TELEOP · FLOWERS" : view.phaseLabel;
     q(".ov-center").classList.toggle("unlocked", view.clock.flowerUnlocked);
@@ -334,10 +475,12 @@ export async function mountGameScreen(root: HTMLElement, options: GameOptions, a
       : null;
     overlayEl.classList.toggle("ov-dim", hud.mode !== "hidden" && !!hive && rectsOverlap(hive, overlayRect));
 
-    const toasts = view.messages.slice(-3).join("|");
+    if (localToast && localToast.until < performance.now()) localToast = null;
+    const messages = [...view.messages.slice(-3), ...(localToast ? [localToast.text] : [])];
+    const toasts = messages.join("|");
     if (toasts !== lastToasts) {
       lastToasts = toasts;
-      toastArea.innerHTML = view.messages.slice(-3).map((m) => `<div class="toast">${escapeHtml(m)}</div>`).join("");
+      toastArea.innerHTML = messages.map((m) => `<div class="toast">${escapeHtml(m)}</div>`).join("");
     }
   };
 
@@ -364,6 +507,8 @@ export async function mountGameScreen(root: HTMLElement, options: GameOptions, a
   if (options.mode === "match") startPrompt();
 
   return () => {
+    counters.red.dispose();
+    counters.blue.dispose();
     window.removeEventListener("keydown", onKey);
     game?.dispose();
     game = null;

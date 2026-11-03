@@ -251,3 +251,47 @@ h1, h2, h3 { line-height: 1.2; margin: 0 0 0.5em; }
   .workshop { grid-template-columns: 1fr; }
   .ws-canvas { height: 300px; }
 }
+
+/* Marco 5: placar animado, RP conquistado, replay, resultado e ranking */
+.ov-alliance { position: relative; }
+.ov-score.bump { animation: ov-bump 0.5s ease-out; }
+@keyframes ov-bump { 0% { transform: scale(1); } 30% { transform: scale(1.22); color: var(--buzz-yellow); } 100% { transform: scale(1); } }
+.ov-gain { position: absolute; top: -4px; font-weight: 900; font-size: 1rem; color: var(--buzz-yellow); text-shadow: 0 1px 3px #000; pointer-events: none; animation: ov-gain 1.2s ease-out forwards; }
+.ov-alliance.blue .ov-gain { right: 12px; }
+.ov-alliance.red .ov-gain { left: 12px; }
+@keyframes ov-gain { 0% { opacity: 0; transform: translateY(6px); } 15% { opacity: 1; } 100% { opacity: 0; transform: translateY(-26px); } }
+.ov-icon.just-earned { animation: rp-earned 1.4s ease-out; }
+@keyframes rp-earned { 0% { transform: scale(1); box-shadow: 0 0 0 0 rgba(247, 227, 38, 0.9); } 40% { transform: scale(1.35); box-shadow: 0 0 0 10px rgba(247, 227, 38, 0); } 100% { transform: scale(1); } }
+
+.replay-bar { position: absolute; left: 50%; bottom: 16px; transform: translateX(-50%); display: flex; align-items: center; gap: 8px; padding: 8px 12px; background: rgba(14, 16, 19, 0.92); border: 1px solid var(--border); border-radius: 999px; width: min(720px, calc(100% - 32px)); z-index: 5; }
+.replay-bar[hidden] { display: none; }
+.replay-bar button { background: var(--surface-2); color: var(--text); border: 1px solid var(--border); border-radius: 999px; padding: 4px 10px; font: inherit; font-size: 0.85rem; }
+.replay-bar button[aria-pressed="true"] { background: var(--buzz-yellow); color: #111; }
+.replay-bar input[type="range"] { flex: 1; min-width: 60px; accent-color: var(--buzz-yellow); }
+.replay-tag { font-weight: 900; font-size: 0.75rem; letter-spacing: 0.08em; color: #111; background: var(--buzz-yellow); border-radius: 4px; padding: 2px 6px; }
+.replay-time { font-variant-numeric: tabular-nums; font-size: 0.8rem; color: var(--text-muted); min-width: 92px; }
+.replay-speed { display: flex; gap: 2px; }
+.game:has(.replay-bar:not([hidden])) .robot-panel, .game:has(.replay-bar:not([hidden])) .help { display: none; }
+
+.result-hero { display: grid; grid-template-columns: 1fr auto 1fr; gap: 10px; align-items: stretch; margin-bottom: 12px; }
+.rh-alliance { border-radius: 10px; padding: 10px 14px; color: #fff; display: flex; flex-direction: column; justify-content: center; }
+.rh-alliance.red { background: linear-gradient(135deg, #a8121a, var(--first-red)); }
+.rh-alliance.blue { background: linear-gradient(135deg, #004f8a, var(--first-blue)); text-align: right; }
+.rh-alliance span { font-size: 0.8rem; opacity: 0.9; }
+.rh-alliance strong { font-size: 2.6rem; font-weight: 900; line-height: 1.05; font-variant-numeric: tabular-nums; }
+.rh-center { text-align: center; display: flex; flex-direction: column; justify-content: center; gap: 4px; }
+.rh-center h2 { margin: 0; font-size: 1.1rem; }
+.rh-record { font-weight: 700; color: #111; background: var(--buzz-yellow); border-radius: 999px; padding: 2px 10px; font-size: 0.8rem; }
+.rh-sub { color: var(--text-muted); font-size: 0.8rem; }
+.rh-rp { display: flex; align-items: center; gap: 12px; margin: 6px 0 12px; }
+.rh-rp .ov-bonus { display: flex; gap: 6px; }
+.rh-rank { margin-top: 12px; }
+.ranking-actions { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; margin: 12px 0 20px; }
+.ranking-actions label.btn { cursor: pointer; }
+.table-wrap { overflow-x: auto; }
+.ranking-table td:nth-child(2) { text-align: left; }
+@media (max-width: 560px) {
+  .result-hero { grid-template-columns: 1fr 1fr; }
+  .rh-center { grid-column: 1 / -1; grid-row: 1; }
+  .replay-speed, .replay-time { display: none; }
+}
