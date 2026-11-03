@@ -37,6 +37,7 @@ Já disponível (marcos M0–M3):
   - **REV DUO**: tração tanque por correias e um servo que tira o POLLEN da FLOWER;
   - **AndyMark Robits**: tanque com rodas omni e stealth, lançador com capô e servo de retirada.
   - Os starter bots não andam de lado nem pontuam na FLOWER. Detalhes em [docs/starter-bots.md](docs/starter-bots.md).
+- **Robôs-bot**: parceiro e até 2 adversários controlados pelo simulador (fácil, médio ou difícil), com HUMAN PLAYER azul automático. Eles coletam POLLEN, lançam na própria HIVE com revezamento e estacionam no fim. Detalhes em [docs/bots.md](docs/bots.md).
 - **Código Java do Android Studio na partida**: importe a pasta ou o `.zip` do TeamCode na Oficina, sem mudar nada (Pedro Pathing e RoadRunner inclusos). Escolha um OpMode @Autonomous para o AUTO e um @TeleOp para o TELEOP: INIT, START e STOP seguem a partida, como no Driver Station. A compilação roda em segundo plano, com cache, erros em português e telemetria no HUD. Detalhes em [docs/m5a-java-runtime.md](docs/m5a-java-runtime.md).
 - **Oficina com importação de CAD**: GLB, STL e STEP (até 40 MB no navegador). Montagens maiores passam pelo conversor `npm run cad:convert`. O modelo é orientado, conferido contra o R102 e guardado neste aparelho; depois, aparece na tela "Jogar". Detalhes em [docs/cad-import.md](docs/cad-import.md).
 - **Cenário de evento** gerado no código: céu com nuvens, gramado, floresta, cogumelos e flores low-poly, painéis com as faixas da WestSharks (com espaço para a logo autorizada), três arquibancadas com plateia e, em cada ALLIANCE AREA, 2 HUMAN PLAYERS apicultores, 2 pilotos e 1 técnico.
@@ -55,7 +56,7 @@ Já disponível (marcos M0–M3):
 - **Controles**: teclado, gamepad e toque; câmeras de plateia, piloto, robô, de cima e livre.
 - **Qualidade ajustável** para computadores escolares modestos.
 
-Próximos marcos: marcação de mecanismos no CAD, visão (AprilTag), robôs-bot e mais equipes na partida. O roadmap completo está em [docs/phase-1-analysis.md](docs/phase-1-analysis.md).
+Próximos marcos: marcação de mecanismos no CAD, visão (AprilTag) e faltas de contato entre robôs. O roadmap completo está em [docs/phase-1-analysis.md](docs/phase-1-analysis.md).
 
 ## Sumário
 

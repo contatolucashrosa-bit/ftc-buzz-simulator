@@ -37,6 +37,7 @@ Available now (milestones M0–M3):
   - **REV DUO**: belt tank drive and a servo that takes POLLEN out of the FLOWER;
   - **AndyMark Robits**: tank drive with omni and stealth wheels, hooded launcher and a release servo.
   - The starter bots cannot strafe or score in the FLOWER. Details in [docs/starter-bots.md](docs/starter-bots.md) (in Portuguese).
+- **Bot robots**: a partner and up to 2 opponents controlled by the simulator (easy, medium or hard), with an automatic blue HUMAN PLAYER. They collect POLLEN, launch into their own HIVE taking turns, and park at the end. Details in [docs/bots.md](docs/bots.md) (in Portuguese).
 - **Android Studio Java code in the match**: import the TeamCode folder or `.zip` in the Workshop, unchanged (Pedro Pathing and RoadRunner included). Pick an @Autonomous OpMode for AUTO and a @TeleOp for TELEOP: INIT, START and STOP follow the match, like the Driver Station. Compilation runs in the background, with caching, Portuguese error messages and telemetry in the HUD. Details in [docs/m5a-java-runtime.md](docs/m5a-java-runtime.md) (in Portuguese).
 - **Workshop with CAD import**: GLB, STL and STEP (up to 40 MB in the browser). Larger assemblies go through the `npm run cad:convert` converter. The model is oriented, checked against R102 and stored on this device; it then shows up on the "Play" screen. Details in [docs/cad-import.md](docs/cad-import.md) (in Portuguese).
 - **Event scenery** generated in code: sky with clouds, grass, low-poly forest, mushrooms and flowers, backdrops with WestSharks banners (with a slot for the authorized logo), three bleachers with an audience and, in each ALLIANCE AREA, 2 beekeeper HUMAN PLAYERS, 2 drivers and 1 coach.
@@ -55,7 +56,7 @@ Available now (milestones M0–M3):
 - **Controls**: keyboard, gamepad and touch; audience, driver, robot, top-down and free cameras.
 - **Adjustable quality** for modest school computers.
 
-Next milestones: mechanism tagging on the CAD, vision (AprilTag), bot robots and more teams in the match. The full roadmap is in [docs/phase-1-analysis.md](docs/phase-1-analysis.md) (in Portuguese).
+Next milestones: mechanism tagging on the CAD, vision (AprilTag) and robot contact fouls. The full roadmap is in [docs/phase-1-analysis.md](docs/phase-1-analysis.md) (in Portuguese).
 
 ## Table of Contents
 
