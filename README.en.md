@@ -78,6 +78,7 @@ The source of truth for the rules is the official *BIOBUZZ Competition Manual*, 
 - **Season scenery** generated in code, inspired by the BIOBUZZ reveal video: the arena in a meadow with hills, a pine forest, ferns, wildflowers and mushrooms; DRIVE TEAMS and HUMAN PLAYERS as beekeepers in full suits (pink for red, lavender for blue), plus synthesized **sounds**.
 - **Arena in the video and CAD colors:** light-gray TILES, polycarbonate perimeter with black rails, green FLOWERS with yellow tops and HIVE CELLS framed in the alliance color.
 - **Arena-style lighting:** soft shadows, reflections on metal and plastic, ambient occlusion and textured foam TILES, in three quality presets (Low, for Chromebooks, stays light).
+- **Meet *FIRST*:** a page introducing *FIRST*®, the three programs and the *FIRST* CANOPY season challenges, its values, SESI as the operator in Brazil and how to join a team, linking to the official sites (no logos).
 - **Controls** for keyboard, gamepad and touch; adjustable graphics quality for modest school computers.
 
 ---
@@ -146,7 +147,8 @@ The scoring engine does not depend on 3D: it takes a "snapshot" of the match and
 | `src/java/hardwareBus.ts` | Connects the Java `hardwareMap` to the simulated motors and sensors. |
 | `src/workshop/cadImport.ts` | Reading and normalizing GLB, STL and STEP. |
 | `src/workshop/robotPackage.ts` | `.buzzrobot.zip` package for moving robots between computers. |
-| `src/ui/app.ts` | Navigation and the Home, Play, Workshop, Leaderboards, Team robots and About screens. |
+| `src/ui/app.ts` | Navigation and the Play, Workshop, Leaderboards, Team robots and About screens. |
+| `src/ui/home.ts` | Home page and the "Meet *FIRST*" page (programs, *FIRST* CANOPY season, values, SESI and how to join). |
 | `scripts/step-to-glb.mjs` | Converts large STEP assemblies to GLB (`npm run cad:convert`). |
 | `scripts/offline-plugin.mjs` | Generates the service worker that makes the app work offline. |
 
