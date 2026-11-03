@@ -61,6 +61,31 @@ const ELEMENT_REST_Z = ELEMENTS.pollenRadius + 0.05;
 const SERVO_DROP = { side: 4.1, z: ELEMENT_REST_Z, rollSpeed: 0.08 }; // pol, pol, m/s
 
 
+let holeTexture: THREE.CanvasTexture | null = null;
+
+/** Furação de perfil de alumínio (padrão de 24 mm, ~1 pol): clara no metal, escura no furo; multiplica a cor. */
+function perforatedTexture(): THREE.CanvasTexture {
+  if (holeTexture) return holeTexture;
+  const canvas = document.createElement("canvas");
+  canvas.width = canvas.height = 64;
+  const ctx = canvas.getContext("2d")!;
+  ctx.fillStyle = "#ffffff";
+  ctx.fillRect(0, 0, 64, 64);
+  const g = ctx.createRadialGradient(32, 32, 6, 32, 32, 14);
+  g.addColorStop(0, "#151515");
+  g.addColorStop(0.75, "#2a2a2a");
+  g.addColorStop(1, "#ffffff");
+  ctx.fillStyle = g;
+  ctx.beginPath();
+  ctx.arc(32, 32, 14, 0, Math.PI * 2);
+  ctx.fill();
+  holeTexture = new THREE.CanvasTexture(canvas);
+  holeTexture.colorSpace = THREE.SRGBColorSpace;
+  holeTexture.wrapS = holeTexture.wrapT = THREE.RepeatWrapping;
+  holeTexture.anisotropy = 4;
+  return holeTexture;
+}
+
 function signTexture(teamNumber: string, color: number): THREE.CanvasTexture {
   // ROBOT SIGN (R401–R403): número branco sobre a cor da aliança
   const canvas = document.createElement("canvas");
@@ -176,6 +201,13 @@ export class Robot {
     const hl = this.halfLength;
     const hw = this.halfWidth;
     const frame = new THREE.MeshStandardMaterial({ color: preset.frameColor, metalness: 0.5, roughness: 0.5 });
+    // trilhos com furação: um furo por polegada ao longo do comprimento (a textura se repete pela face)
+    const rail = (lengthIn: number, heightIn: number) => {
+      const map = perforatedTexture().clone();
+      map.repeat.set(Math.max(1, Math.round(lengthIn)), Math.max(1, Math.round(heightIn)));
+      map.needsUpdate = true;
+      return new THREE.MeshStandardMaterial({ color: preset.frameColor, map, metalness: 0.55, roughness: 0.42 });
+    };
     const alu = new THREE.MeshStandardMaterial({ color: 0xb8bcc4, metalness: 0.7, roughness: 0.35 });
     const rubber = new THREE.MeshStandardMaterial({ color: 0x1b1c1f, roughness: 0.9 });
     const accent = new THREE.MeshStandardMaterial({ color: preset.accentColor, roughness: 0.55, side: THREE.DoubleSide });
@@ -186,16 +218,21 @@ export class Robot {
       return mesh;
     };
     const bottom = -CHASSIS_HEIGHT / 2;
+    const hub = new THREE.MeshStandardMaterial({ color: 0xd4d7dd, metalness: 0.85, roughness: 0.3 });
     const wheel = (radius: number, thickness: number, mat: THREE.Material, x: number, z: number) => {
-      const m = add(new THREE.Mesh(new THREE.CylinderGeometry(radius * INCH, radius * INCH, thickness * INCH, 14), mat), x, bottom + radius - 0.6, z);
+      const m = add(new THREE.Mesh(new THREE.CylinderGeometry(radius * INCH, radius * INCH, thickness * INCH, 18), mat), x, bottom + radius - 0.6, z);
       m.rotation.x = Math.PI / 2;
+      // cubo de alumínio aparente dos dois lados
+      const h = add(new THREE.Mesh(new THREE.CylinderGeometry(radius * 0.55 * INCH, radius * 0.55 * INCH, (thickness + 0.15) * INCH, 14), hub), x, bottom + radius - 0.6, z);
+      h.rotation.x = Math.PI / 2;
     };
     // No mesh, o "para a frente" do robô é +X local (heading 0 = +x do manual).
 
     // Base: placa inferior + trilhos laterais e traseiro (as rodas ficam por dentro)
     add(new THREE.Mesh(new THREE.BoxGeometry(L * INCH, 0.6 * INCH, (W - 3) * INCH), frame), 0, bottom + 1.2, 0);
-    for (const side of [-1, 1]) add(new THREE.Mesh(new THREE.BoxGeometry(L * INCH, CHASSIS_HEIGHT * 0.7 * INCH, 1 * INCH), frame), 0, 0.1, side * (hw - 0.5));
-    add(new THREE.Mesh(new THREE.BoxGeometry(1 * INCH, CHASSIS_HEIGHT * 0.7 * INCH, (W - 2) * INCH), frame), -hl + 0.5, 0.1, 0);
+    const railMat = rail(L, CHASSIS_HEIGHT * 0.7);
+    for (const side of [-1, 1]) add(new THREE.Mesh(new THREE.BoxGeometry(L * INCH, CHASSIS_HEIGHT * 0.7 * INCH, 1 * INCH), railMat), 0, 0.1, side * (hw - 0.5));
+    add(new THREE.Mesh(new THREE.BoxGeometry(1 * INCH, CHASSIS_HEIGHT * 0.7 * INCH, (W - 2) * INCH), rail(W - 2, CHASSIS_HEIGHT * 0.7)), -hl + 0.5, 0.1, 0);
 
     // Tração
     if (preset.id === "revDuo") {

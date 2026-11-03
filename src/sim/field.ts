@@ -9,30 +9,75 @@ export const ALLIANCE_COLORS = { red: 0xed1c24, blue: 0x0066b3 } as const; // FI
 
 const TEXTURE_SIZE = 1024;
 
-function floorTexture(): THREE.CanvasTexture {
+/** Gerador pseudoaleatório fixo: a textura sai igual em toda partida (e nos replays). */
+function seeded(seed: number): () => number {
+  let x = seed;
+  return () => {
+    x = (x * 1664525 + 1013904223) % 4294967296;
+    return x / 4294967296;
+  };
+}
+
+/** Bordas de encaixe dos TILES de espuma: dentes de 1 pol alternando de lado ao longo da junta. */
+function seamPath(ctx: CanvasRenderingContext2D, px: number, along: "x" | "y", at: number, length: number): void {
+  const tooth = 0.7 * px;
+  const step = 1.5 * px;
+  ctx.beginPath();
+  for (let s = 0, k = 0; s <= length; s += step, k++) {
+    const off = k % 2 ? tooth / 2 : -tooth / 2;
+    if (along === "x") {
+      ctx.lineTo(s, at + off);
+      ctx.lineTo(s + step, at + off);
+    } else {
+      ctx.lineTo(at + off, s);
+      ctx.lineTo(at + off, s + step);
+    }
+  }
+  ctx.stroke();
+}
+
+function floorTexture(): { map: THREE.CanvasTexture; bump: THREE.CanvasTexture } {
   const canvas = document.createElement("canvas");
   canvas.width = canvas.height = TEXTURE_SIZE;
   const ctx = canvas.getContext("2d")!;
+  // relevo: claro = alto; as juntas e os poros da espuma ficam mais baixos
+  const bumpCanvas = document.createElement("canvas");
+  bumpCanvas.width = bumpCanvas.height = TEXTURE_SIZE / 2;
+  const bump = bumpCanvas.getContext("2d")!;
   const px = TEXTURE_SIZE / (FIELD.half * 2); // pixels por polegada
   const toPx = (x: number, y: number) => [(x + FIELD.half) * px, (FIELD.half - y) * px] as const;
+  const rand = seeded(24823);
 
-  // TILES de espuma cinza com leve variação (6 × 6, §9.2)
+  // TILES de espuma cinza (6 × 6, §9.2): cada um com tom levemente diferente e textura de poros
   for (let i = 0; i < 6; i++) {
     for (let j = 0; j < 6; j++) {
-      const shade = 92 + ((i + j) % 2) * 6;
-      ctx.fillStyle = `rgb(${shade},${shade},${shade + 4})`;
+      const shade = 76 + Math.round(rand() * 8);
+      ctx.fillStyle = `rgb(${shade},${shade + 1},${shade + 5})`;
       ctx.fillRect(i * 24 * px, j * 24 * px, 24 * px, 24 * px);
     }
   }
-  ctx.strokeStyle = "rgba(30,30,30,0.6)";
-  ctx.lineWidth = 2;
+  bump.fillStyle = "#c0c0c0";
+  bump.fillRect(0, 0, bumpCanvas.width, bumpCanvas.height);
+  for (let n = 0; n < 26000; n++) {
+    const x = rand() * TEXTURE_SIZE;
+    const y = rand() * TEXTURE_SIZE;
+    const v = rand();
+    ctx.fillStyle = v > 0.5 ? "rgba(255,255,255,0.05)" : "rgba(0,0,0,0.07)";
+    ctx.fillRect(x, y, 1.4, 1.4);
+    bump.fillStyle = v > 0.5 ? "#d0d0d0" : "#a8a8a8";
+    bump.fillRect(x / 2, y / 2, 1, 1);
+  }
+
+  // juntas com encaixe
+  ctx.strokeStyle = "rgba(20,21,25,0.5)";
+  ctx.lineWidth = 1.5;
+  bump.strokeStyle = "#202020";
+  bump.lineWidth = 2;
   for (let k = 1; k < 6; k++) {
-    ctx.beginPath();
-    ctx.moveTo(k * 24 * px, 0);
-    ctx.lineTo(k * 24 * px, TEXTURE_SIZE);
-    ctx.moveTo(0, k * 24 * px);
-    ctx.lineTo(TEXTURE_SIZE, k * 24 * px);
-    ctx.stroke();
+    seamPath(ctx, px, "y", k * 24 * px, TEXTURE_SIZE);
+    seamPath(ctx, px, "x", k * 24 * px, TEXTURE_SIZE);
+    seamPath(bump, px / 2, "y", (k * 24 * px) / 2, TEXTURE_SIZE / 2);
+    seamPath(bump, px / 2, "x", (k * 24 * px) / 2, TEXTURE_SIZE / 2);
   }
 
   const tapeRect = (r: Rect, color: string, filled: boolean) => {
@@ -52,10 +97,10 @@ function floorTexture(): THREE.CanvasTexture {
   tapeRect(GARDENS.red, "#ed1c24", true);
   tapeRect(GARDENS.blue, "#1e7fd0", true);
 
-  const texture = new THREE.CanvasTexture(canvas);
-  texture.colorSpace = THREE.SRGBColorSpace;
-  texture.anisotropy = 4;
-  return texture;
+  const map = new THREE.CanvasTexture(canvas);
+  map.colorSpace = THREE.SRGBColorSpace;
+  map.anisotropy = 8;
+  return { map, bump: new THREE.CanvasTexture(bumpCanvas) };
 }
 
 export function buildField(physics: PhysicsWorld, scene: THREE.Scene): void {
@@ -69,7 +114,10 @@ export function buildField(physics: PhysicsWorld, scene: THREE.Scene): void {
   );
   const floor = new THREE.Mesh(
     new THREE.PlaneGeometry(size, size),
-    new THREE.MeshStandardMaterial({ map: floorTexture(), roughness: 0.95 }),
+    (() => {
+      const { map, bump } = floorTexture();
+      return new THREE.MeshStandardMaterial({ map, bumpMap: bump, bumpScale: 1.2, roughness: 0.93, envMapIntensity: 0.3 });
+    })(),
   );
   floor.rotation.x = -Math.PI / 2;
   floor.receiveShadow = true;
