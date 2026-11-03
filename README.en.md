@@ -75,7 +75,8 @@ The source of truth for the rules is the official *BIOBUZZ Competition Manual*, 
 - **CAD Workshop:** imports GLB, STL and STEP (up to 40 MB in the browser), orients the model, checks R102 and stores it on the device.
 - **Team robots:** export and import robots as `.buzzrobot.zip`, with model, measurements, mechanisms and credit.
 - Recreated **Score Overlay**, animated scoreboard, results screen, **replay** of the last 30 s and an exportable local **ranking**.
-- **Event scenery** generated in code, with audience, drivers, coaches and animated HUMAN PLAYERS, plus synthesized **sounds**.
+- **Season scenery** generated in code, inspired by the BIOBUZZ reveal video: the arena in a meadow with hills, a pine forest, ferns, wildflowers and mushrooms; DRIVE TEAMS and HUMAN PLAYERS as beekeepers in full suits (pink for red, lavender for blue), plus synthesized **sounds**.
+- **Arena in the video and CAD colors:** light-gray TILES, polycarbonate perimeter with black rails, green FLOWERS with yellow tops and HIVE CELLS framed in the alliance color.
 - **Arena-style lighting:** soft shadows, reflections on metal and plastic, ambient occlusion and textured foam TILES, in three quality presets (Low, for Chromebooks, stays light).
 - **Controls** for keyboard, gamepad and touch; adjustable graphics quality for modest school computers.
 

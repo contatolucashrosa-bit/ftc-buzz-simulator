@@ -75,7 +75,8 @@ A fonte da verdade das regras é o manual oficial *BIOBUZZ Competition Manual*, 
 - **Oficina de CAD:** importa GLB, STL e STEP (até 40 MB no navegador), orienta o modelo, confere o R102 e guarda no aparelho.
 - **Robôs da equipe:** exporta e importa robôs como `.buzzrobot.zip`, com modelo, medidas, mecanismos e crédito.
 - **Score Overlay** recriado, placar animado, tela de resultado, **replay** dos últimos 30 s e **ranking** local exportável.
-- **Cenário de evento** gerado no código, com plateia, pilotos, técnicos e HUMAN PLAYERS animados, e **sons** sintetizados.
+- **Cenário da temporada** gerado no código, inspirado no vídeo de divulgação da BIOBUZZ: a arena num prado com colinas, floresta de pinheiros, samambaias, flores silvestres e cogumelos; DRIVE TEAMS e HUMAN PLAYERS como apicultores de macacão (rosa na vermelha, lavanda na azul), além de **sons** sintetizados.
+- **Arena nas cores do vídeo e do CAD:** TILES cinza-claro, perímetro de policarbonato com perfis pretos, FLOWERS verdes com topo amarelo e CELLS da HIVE com molduras na cor da aliança.
 - **Gráficos com iluminação de ginásio:** sombras suaves, reflexos em metal e plástico, oclusão de ambiente e TILES de espuma com relevo, em três presets de qualidade (o Baixo, para Chromebooks, continua leve).
 - **Controles** por teclado, gamepad e toque; qualidade gráfica ajustável para computadores escolares modestos.
 

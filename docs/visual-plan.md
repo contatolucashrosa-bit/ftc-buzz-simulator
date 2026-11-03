@@ -60,3 +60,11 @@
 
   Capturas de comparação sem a aba visível: `?autoplay&quality=high&cam=driver` (só no servidor de desenvolvimento) abre direto no treino.
 - **Marco 4:** céu, gramado, floresta, cogumelos, flores, arquibancada com plateia (animada no Alto) e banners da WestSharks, tudo em `src/render/environment.ts`, com quantidades por preset. Medido no navegador: cerca de 57 FPS nos três presets (limite da taxa de atualização da tela).
+- **Cenário da temporada (03/11/2026), substitui o do Marco 4:**
+  - inspirado no vídeo de divulgação da BIOBUZZ: a arena fica num prado aberto, sem arquibancadas, painéis ou plateia;
+  - o terreno sobe em colinas a partir de ~9 m, com uma floresta densa de pinheiros escuros ao fundo, neblina esverdeada, samambaias, arbustos, flores silvestres e cogumelos vermelhos;
+  - as equipes são apicultores de macacão inteiro com véu e chapéu de abas largas (rosa na aliança vermelha, lavanda na azul); os pilotos seguram o controle e o HUMAN PLAYER busca o NECTAR numa cesta;
+  - arena nas cores do vídeo: TILES cinza-claro, perímetro transparente com perfis pretos, FLOWERS com canos verdes, anel do topo amarelo e batente roxo, CELLS com molduras na cor da aliança;
+  - a câmera da plateia ficou mais longe e com lente mais fechada, como numa transmissão.
+
+  Custo (RTX 4060, janela de ~575 × 534): Médio 5,7 ms; Alto 10,5 ms, com o GTAO em meia resolução (em resolução cheia passava de 14 ms, porque o GTAO redesenha o cenário inteiro).
