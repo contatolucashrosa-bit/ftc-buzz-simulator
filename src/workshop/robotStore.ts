@@ -14,6 +14,8 @@ export interface StoredRobotMeta {
   sourceFile: string;
   triangles: number;
   createdAt: number;
+  /** Crédito de quem fez o CAD (pacotes .buzzrobot.zip). */
+  credits?: { team: string; author: string };
 }
 
 export interface StoredRobot extends StoredRobotMeta {

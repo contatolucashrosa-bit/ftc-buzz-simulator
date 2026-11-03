@@ -12,6 +12,7 @@ import { CAD_PREFIX, listRobots } from "../workshop/robotStore";
 import { bindRanking, rankingHtml } from "./ranking";
 import { getProject, listProjects, opModeRef, parseOpModeRef, type HardwareUse } from "../java/project";
 import type { JavaOpModeRun, JavaSetup } from "../game/game";
+import { bindTeamRobots, teamRobotsHtml } from "./teamRobots";
 import { BOT_LEVELS, type BotLevel } from "../game/bot";
 
 type Route = "home" | "setup" | "workshop" | "leaderboard" | "teamRobots" | "about";
@@ -94,12 +95,7 @@ export class App {
       setup: () => this.setupHtml(),
       workshop: () => `<div data-workshop><p class="lead">Carregando a Oficina…</p></div>`,
       leaderboard: () => rankingHtml(),
-      teamRobots: () =>
-        this.comingSoonHtml(
-          "Robôs da equipe",
-          "Vitrine com o robô da WestSharks #24823 e espaço para outras equipes brasileiras compartilharem os seus, por arquivo .buzzrobot.zip, com autorização e crédito.",
-          "M10",
-        ),
+      teamRobots: () => teamRobotsHtml(this.prefs.teamNumber),
       about: () => this.aboutHtml(),
     };
     this.root.innerHTML = `${this.navHtml(route)}<main class="page" id="main">${pages[route]()}</main>${this.footerHtml()}`;
@@ -107,6 +103,7 @@ export class App {
     if (route === "setup") this.bindSetup();
     if (route === "workshop") this.mountWorkshop();
     if (route === "leaderboard") bindRanking(this.root);
+    if (route === "teamRobots") bindTeamRobots(this.root);
     this.root.querySelectorAll<HTMLElement>("[data-go]").forEach((el) =>
       el.addEventListener("click", () => this.go(el.dataset.go as Route)),
     );
@@ -317,14 +314,6 @@ export class App {
     const { mountWorkshop } = await importFresh(() => import("./workshop"));
     if (!host.isConnected) return;
     this.cleanup = await mountWorkshop(host);
-  }
-
-  private comingSoonHtml(title: string, text: string, milestone: string): string {
-    return `
-      <h1>${title} <span class="badge">em construção</span></h1>
-      <p class="lead">${text}</p>
-      <p class="notice">Previsto no roadmap: marco ${milestone}. Veja o plano completo em <code>docs/phase-1-analysis.md</code>.</p>
-      <button class="btn btn-primary" data-play="practice">Enquanto isso, treinar</button>`;
   }
 
   private aboutHtml(): string {
