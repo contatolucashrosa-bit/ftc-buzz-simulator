@@ -483,7 +483,9 @@ export class Game {
     }
     // na câmera do piloto, as pessoas da própria ALLIANCE AREA ficam coladas à câmera e tapavam metade do campo
     this.environment.alliances.red.visible = this.stage.mode !== "driver";
-    this.environment.update(realDt, this.stage.camera.position);
+    for (const alliance of ["red", "blue"] as const) this.environment.setNectarStock(alliance, this.pools[alliance].staged + this.pools[alliance].returned);
+    // pausado ou em replay, as pessoas param junto com o jogo
+    this.environment.update(this.paused || this.replay ? 0 : realDt, this.stage.camera.position);
     // a câmera do robô segue o modelo (no replay, a pose gravada)
     const g = this.robot.group;
     this.stage.update({ position: g.position.clone(), heading: yawOf(g.quaternion) });
@@ -716,9 +718,13 @@ export class Game {
     }
     const lz = LOADING_ZONES[alliance];
     const x = alliance === "red" ? lz.xMin + 3 : lz.xMax - 3;
-    this.elements.spawn(nectarOf(alliance), x, (lz.yMin + lz.yMax) / 2, 8);
-    this.environment.tossNectar(alliance);
-    this.flash("NECTAR introduzido na LOADING ZONE");
+    // o NECTAR já saiu da contagem; ele entra no campo quando o HUMAN PLAYER o solta na LOADING ZONE
+    this.environment.requestNectar(alliance, () => {
+      if (this.finished) return;
+      this.elements.spawn(nectarOf(alliance), x, (lz.yMin + lz.yMax) / 2, 8);
+      this.flash("NECTAR introduzido na LOADING ZONE");
+    });
+    this.flash("HUMAN PLAYER buscando um NECTAR");
   }
 
   /** G410: NECTAR no volume da FLOWER antes de 1:00 restante → MAJOR FOUL por NECTAR. */
