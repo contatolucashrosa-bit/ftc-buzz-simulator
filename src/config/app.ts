@@ -30,6 +30,9 @@ export interface Preferences {
   robotPreset: RobotPresetId;
   /** Robô importado na Oficina (id no IndexedDB); vazio = modelo próprio do simulador. */
   robotModelId: string;
+  /** OpModes Java escolhidos ("<projeto>|<classe>"); vazio = programa de exemplo / pilotagem manual. */
+  javaAuto: string;
+  javaTeleop: string;
 }
 
 const PREFS_KEY = "buzz-simulator:prefs";
@@ -43,7 +46,7 @@ export function defaultQuality(): Quality {
 }
 
 export function loadPrefs(): Preferences {
-  const fallback: Preferences = { teamNumber: "24823", quality: defaultQuality(), autoProgram: "leavePark", eventName: "Treino da equipe", launchIntervalS: DEFAULT_LAUNCH_INTERVAL_S, robotPreset: "generic", robotModelId: "" };
+  const fallback: Preferences = { teamNumber: "24823", quality: defaultQuality(), autoProgram: "leavePark", eventName: "Treino da equipe", launchIntervalS: DEFAULT_LAUNCH_INTERVAL_S, robotPreset: "generic", robotModelId: "", javaAuto: "", javaTeleop: "" };
   try {
     const raw = localStorage.getItem(PREFS_KEY);
     return raw ? { ...fallback, ...(JSON.parse(raw) as Partial<Preferences>) } : fallback;

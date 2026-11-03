@@ -6,6 +6,7 @@ import { ROBOT_PRESETS, ROBOT_PRESET_IDS, type RobotPresetId } from "../config/r
 import { BROWSER_STEP_LIMIT_MB, bakeToGlb, guessScale, guessUp, isSupportedCad, normalize, readCadFile, sizeInches, type ImportSettings, type ImportedCad } from "../workshop/cadImport";
 import { deleteRobot, listRobots, saveRobot } from "../workshop/robotStore";
 import { escapeHtml } from "./dom";
+import { bindJavaSection, javaSectionHtml } from "./javaWorkshop";
 
 const START_LIMIT_IN = 18; // R102: cabe num cubo de 18 pol na largada
 const INCH = 0.0254;
@@ -19,7 +20,7 @@ const UNITS: Array<[number, string]> = [
 export async function mountWorkshop(host: HTMLElement): Promise<() => void> {
   host.innerHTML = `
     <h1>Oficina</h1>
-    <p class="lead">Importe o CAD do seu robô e jogue com ele. Tudo fica guardado só neste aparelho.</p>
+    <p class="lead">Importe o CAD e o código Java do seu robô e jogue com eles. Tudo fica guardado só neste aparelho.</p>
     <div class="workshop">
       <section class="panel ws-viewer">
         <div class="ws-canvas" data-canvas>
@@ -45,6 +46,7 @@ export async function mountWorkshop(host: HTMLElement): Promise<() => void> {
       <h2>Robôs importados</h2>
       <div data-list class="ws-list"></div>
     </section>
+    ${javaSectionHtml()}
     <section class="notice">
       <strong>STEP grande (montagens de 100 MB ou mais)?</strong> O navegador tem limite de memória para ler STEP.
       Converta antes no computador, com o Node instalado: <code>npm run cad:convert -- robo.step robo.glb</code>,
@@ -218,6 +220,8 @@ export async function mountWorkshop(host: HTMLElement): Promise<() => void> {
       saveButton.disabled = false;
     }
   });
+
+  bindJavaSection(host);
 
   return () => {
     cancelAnimationFrame(raf);

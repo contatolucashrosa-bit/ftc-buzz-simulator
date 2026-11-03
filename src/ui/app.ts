@@ -10,6 +10,8 @@ import { LAUNCH_INTERVAL_LIMITS, clampLaunchInterval as clampInterval } from "..
 import { ROBOT_PRESETS, ROBOT_PRESET_IDS, robotPreset } from "../config/robotPresets";
 import { CAD_PREFIX, listRobots } from "../workshop/robotStore";
 import { bindRanking, rankingHtml } from "./ranking";
+import { getProject, listProjects, opModeRef, parseOpModeRef, type HardwareUse } from "../java/project";
+import type { JavaOpModeRun, JavaSetup } from "../game/game";
 
 type Route = "home" | "setup" | "workshop" | "leaderboard" | "teamRobots" | "about";
 
@@ -48,6 +50,12 @@ async function importFresh<T>(load: () => Promise<T>): Promise<T> {
     }
     throw error;
   }
+}
+
+/** Programa do AUTO: um exemplo ou um OpMode Java ("java:<projeto>|<classe>"). */
+function readAutoChoice(value: string | undefined, fallback: AutoProgramId): Pick<Preferences, "autoProgram" | "javaAuto"> {
+  if (value?.startsWith("java:")) return { autoProgram: fallback, javaAuto: value.slice(5) };
+  return { autoProgram: (value as AutoProgramId) ?? "leavePark", javaAuto: "" };
 }
 
 /** Robô escolhido na tela "Jogar": um modelo do simulador ou um CAD importado (com os mecanismos guardados). */
@@ -161,7 +169,7 @@ export class App {
     const p = this.prefs;
     const autoChoices = (Object.keys(AUTO_PROGRAMS) as AutoProgramId[])
       .map(
-        (id) => `<label class="choice"><input type="radio" name="auto" value="${id}" ${p.autoProgram === id ? "checked" : ""}>
+        (id) => `<label class="choice"><input type="radio" name="auto" value="${id}" ${!p.javaAuto && p.autoProgram === id ? "checked" : ""}>
         <span>${AUTO_PROGRAMS[id].label}<small>${AUTO_PROGRAMS[id].description}</small></span></label>`,
       )
       .join("");
@@ -194,7 +202,14 @@ export class App {
         <fieldset class="field choices">
           <legend>Programa do AUTO</legend>
           ${autoChoices}
-          <small>Programas de exemplo. A importação do seu código Java do Android Studio chega no marco M5.</small>
+          <div data-java-auto></div>
+          <small>Programas de exemplo ou um OpMode @Autonomous do seu projeto Java (importe na Oficina).</small>
+        </fieldset>
+        <fieldset class="field choices">
+          <legend>TELEOP</legend>
+          <label class="choice"><input type="radio" name="teleop" value="" ${!p.javaTeleop ? "checked" : ""}><span>Pilotar com teclado ou controle<small>Os comandos do simulador (W A S D, Espaço, F, G…).</small></span></label>
+          <div data-java-teleop></div>
+          <small>Com um OpMode @TeleOp, o seu código lê o gamepad e comanda o robô, como no Driver Station.</small>
         </fieldset>
         <div class="field">
           <label for="interval">Tempo entre lançamentos (s)</label>
@@ -220,7 +235,8 @@ export class App {
       this.prefs = {
         teamNumber: team,
         eventName: form.querySelector<HTMLInputElement>("#event")!.value.trim() || "Treino da equipe",
-        autoProgram: (form.querySelector<HTMLInputElement>('input[name="auto"]:checked')?.value as AutoProgramId) ?? "leavePark",
+        ...readAutoChoice(form.querySelector<HTMLInputElement>('input[name="auto"]:checked')?.value, this.prefs.autoProgram),
+        javaTeleop: form.querySelector<HTMLInputElement>('input[name="teleop"]:checked')?.value ?? "",
         quality: form.querySelector<HTMLSelectElement>("#quality")!.value as Quality,
         launchIntervalS: clampInterval(Number(form.querySelector<HTMLInputElement>("#interval")!.value.replace(",", "."))),
         ...readRobotChoice(form.querySelector<HTMLInputElement>('input[name="robot"]:checked')),
@@ -234,6 +250,25 @@ export class App {
           form.querySelector<HTMLInputElement>("#interval")!.value = String(robotPreset(readRobotChoice(input).robotPreset).launchIntervalS);
         }),
       );
+    // OpModes Java dos projetos importados na Oficina
+    void listProjects().then((projects) => {
+      const choice = (name: string, type: "autonomous" | "teleop", current: string) =>
+        projects
+          .flatMap((proj) =>
+            proj.opModes
+              .filter((o) => o.type === type && !o.disabled)
+              .map((o) => {
+                const ref = opModeRef(proj.id, o.className);
+                return `<label class="choice"><input type="radio" name="${name}" value="${name === "auto" ? "java:" : ""}${escapeHtml(ref)}" ${current === ref ? "checked" : ""}>
+                <span>${escapeHtml(o.name)} <span class="badge badge-ok">Java</span><small>${escapeHtml(proj.name)} · ${escapeHtml(o.className)}</small></span></label>`;
+              }),
+          )
+          .join("");
+      const auto = form.querySelector("[data-java-auto]");
+      const teleop = form.querySelector("[data-java-teleop]");
+      if (auto) auto.innerHTML = choice("auto", "autonomous", this.prefs.javaAuto);
+      if (teleop) teleop.innerHTML = choice("teleop", "teleop", this.prefs.javaTeleop);
+    });
     // robôs importados na Oficina (IndexedDB) entram depois, sem atrasar a tela
     void listRobots().then((robots) => {
       const slot = form.querySelector("[data-imported-robots]");
@@ -308,11 +343,75 @@ export class App {
     };
     history.replaceState(null, "", "#play");
     this.root.innerHTML = "";
+    if (this.prefs.javaAuto || this.prefs.javaTeleop) {
+      const java = await this.prepareJava(mode);
+      if (java === "cancel") return;
+      if (java) options.java = java;
+    }
     const restart = (opts: GameOptions) => {
       this.teardown();
       void this.mountGame(opts, restart);
     };
     await this.mountGame(options, restart);
+  }
+
+  /**
+   * Compila os OpModes escolhidos antes de abrir a arena (com cache, então da segunda vez é imediato).
+   * Devolve "cancel" se a equipe voltou, null para jogar sem o código.
+   */
+  private async prepareJava(mode: GameMode): Promise<JavaSetup | null | "cancel"> {
+    const page = (html: string) => (this.root.innerHTML = `<main class="page">${html}</main>`);
+    page(`<h1>Preparando o código Java</h1><p class="lead" data-progress>Abrindo o projeto…</p>`);
+    const progress = (text: string) => {
+      const el = this.root.querySelector("[data-progress]");
+      if (el) el.textContent = text;
+    };
+    const { compileOpMode } = await importFresh(() => import("../java/javaRuntime"));
+    const setup: JavaSetup = { deviceMap: {}, hardware: [] };
+    const errors: string[] = [];
+    const roles: Array<["auto" | "teleop", string]> = [];
+    if (this.prefs.javaAuto && mode === "match") roles.push(["auto", this.prefs.javaAuto]);
+    if (this.prefs.javaTeleop) roles.push(["teleop", this.prefs.javaTeleop]);
+    const hardware = new Map<string, HardwareUse>();
+    for (const [role, ref] of roles) {
+      const parsed = parseOpModeRef(ref);
+      const project = parsed ? await getProject(parsed.projectId) : undefined;
+      const op = project?.opModes.find((o) => o.className === parsed?.className);
+      if (!project || !op) {
+        errors.push(`O OpMode escolhido para o ${role === "auto" ? "AUTO" : "TELEOP"} não existe mais (projeto removido?).`);
+        continue;
+      }
+      progress(`${op.name}: preparando…`);
+      const result = await compileOpMode(project, op, (text) => progress(`${op.name}: ${text}`));
+      if (!result.ok) {
+        errors.push(`${op.name}:`, ...result.errors.map((e) => `  ${e}`));
+        continue;
+      }
+      const run: JavaOpModeRun = { label: op.name, js: result.js };
+      setup[role] = run;
+      Object.assign(setup.deviceMap, project.deviceMap);
+      project.hardware.forEach((h) => hardware.set(h.name, h));
+    }
+    setup.hardware = [...hardware.values()];
+    if (!errors.length) return setup.auto || setup.teleop ? setup : null;
+    return new Promise((resolve) => {
+      page(`<h1>O código Java não compilou</h1>
+        <pre class="notice java-errors">${escapeHtml(errors.join("\n"))}</pre>
+        <div class="actions" style="display:flex;gap:12px;flex-wrap:wrap">
+          <button class="btn btn-primary" data-j="without">Jogar sem o código</button>
+          <button class="btn btn-secondary" data-j="workshop">Abrir a Oficina</button>
+          <button class="btn btn-secondary" data-j="back">Voltar</button>
+        </div>`);
+      this.root.querySelector('[data-j="without"]')!.addEventListener("click", () => resolve(setup.auto || setup.teleop ? setup : null));
+      this.root.querySelector('[data-j="workshop"]')!.addEventListener("click", () => {
+        resolve("cancel");
+        this.go("workshop");
+      });
+      this.root.querySelector('[data-j="back"]')!.addEventListener("click", () => {
+        resolve("cancel");
+        this.go("setup");
+      });
+    });
   }
 
   private async mountGame(options: GameOptions, restart: (o: GameOptions) => void): Promise<void> {
