@@ -76,6 +76,7 @@ The source of truth for the rules is the official *BIOBUZZ Competition Manual*, 
 - **Team robots:** export and import robots as `.buzzrobot.zip`, with model, measurements, mechanisms and credit.
 - Recreated **Score Overlay**, animated scoreboard, results screen, **replay** of the last 30 s and an exportable local **ranking**.
 - **Event scenery** generated in code, with audience, drivers, coaches and animated HUMAN PLAYERS, plus synthesized **sounds**.
+- **Arena-style lighting:** soft shadows, reflections on metal and plastic, ambient occlusion and textured foam TILES, in three quality presets (Low, for Chromebooks, stays light).
 - **Controls** for keyboard, gamepad and touch; adjustable graphics quality for modest school computers.
 
 ---

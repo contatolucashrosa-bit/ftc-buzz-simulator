@@ -42,4 +42,21 @@
 - **Marco 2:** POLLEN e NECTAR perfurados (textura procedural com os 26 furos), desenhados com uma malha instanciada por tipo (3 chamadas de desenho para todas as bolas). Sons sintetizados com a Web Audio API (`src/render/audio.ts`): batidas das bolas (pelo salto de velocidade), lançamento, TIP com torcida, pontos e buzinas da partida. Tecla M liga e desliga.
 - **Marco 3:** HUMAN PLAYERS apicultores (vermelho e azul) com máquina de estados: ir até a caixa de NECTAR da ALLIANCE AREA, pegar, voltar à borda da LOADING ZONE e soltar. O NECTAR só entra no campo no instante em que é solto (G426/G427), e a caixa mostra quantos ainda estão fora do campo.
 - **Marco 5:** placar com números animados e "+N", ícones de RP com animação ao conquistar, tela de resultado (recorde e posição no ranking), ranking de qualificação local com troca por arquivo (`src/match/history.ts`) e replay dos últimos 30 s (`src/game/replay.ts`).
+- **Iluminação e materiais (03/11/2026), inspirados no FTCSim (Unity WebGL), mas feitos no Three.js:**
+  - tonemapping ACES;
+  - luz principal quente com sombras suaves (PCF) e contraluz fria;
+  - mapa de ambiente (`RoomEnvironment`) para reflexos em metal e plástico;
+  - oclusão de ambiente (GTAO) com MSAA no pós-processamento;
+  - TILES de espuma com poros, juntas de encaixe e relevo (`bumpMap`);
+  - trilhos do chassi com furação e cubos de alumínio nas rodas.
+
+  Por preset:
+
+  | Preset | Sombras | Reflexos | Oclusão de ambiente | Custo por quadro (RTX 4060, 1280 × 720) |
+  |---|---|---|---|---|
+  | Baixo (padrão em Chromebooks) | — | — | — | igual ao de antes |
+  | Médio | 1024 px | sim | — | 5,0 → 6,4 ms |
+  | Alto | 2048 px | sim | sim | 5,8 → 9,7 ms |
+
+  Capturas de comparação sem a aba visível: `?autoplay&quality=high&cam=driver` (só no servidor de desenvolvimento) abre direto no treino.
 - **Marco 4:** céu, gramado, floresta, cogumelos, flores, arquibancada com plateia (animada no Alto) e banners da WestSharks, tudo em `src/render/environment.ts`, com quantidades por preset. Medido no navegador: cerca de 57 FPS nos três presets (limite da taxa de atualização da tela).

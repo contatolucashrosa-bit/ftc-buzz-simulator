@@ -76,6 +76,7 @@ A fonte da verdade das regras é o manual oficial *BIOBUZZ Competition Manual*, 
 - **Robôs da equipe:** exporta e importa robôs como `.buzzrobot.zip`, com modelo, medidas, mecanismos e crédito.
 - **Score Overlay** recriado, placar animado, tela de resultado, **replay** dos últimos 30 s e **ranking** local exportável.
 - **Cenário de evento** gerado no código, com plateia, pilotos, técnicos e HUMAN PLAYERS animados, e **sons** sintetizados.
+- **Gráficos com iluminação de ginásio:** sombras suaves, reflexos em metal e plástico, oclusão de ambiente e TILES de espuma com relevo, em três presets de qualidade (o Baixo, para Chromebooks, continua leve).
 - **Controles** por teclado, gamepad e toque; qualidade gráfica ajustável para computadores escolares modestos.
 
 ---
