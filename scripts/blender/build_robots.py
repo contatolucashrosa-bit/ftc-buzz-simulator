@@ -69,6 +69,17 @@ def build(key, file, up, front):
         d = obj.modifiers.new("collapse", "DECIMATE")
         d.ratio = BUDGET / tris
         bpy.ops.object.modifier_apply(modifier=d.name)
+    # Zonas de colisão: o robô é fatiado em 3 trechos ao longo do comprimento; cada trecho vira uma caixa com a
+    # largura e a altura do CAD ali (percentil 97, para ignorar fios e antenas). Vão para src/config/robotPresets.ts.
+    zones = []
+    half = (mx.x - mn.x) / 2
+    for i in range(3):
+        x0, x1 = -half + i * 2 * half / 3, -half + (i + 1) * 2 * half / 3
+        pts = [v.co for v in obj.data.vertices if x0 <= v.co.x <= x1]
+        zs = sorted(c.z for c in pts)
+        ys = sorted(abs(c.y) for c in pts)
+        zones.append((round(x0 / 0.0254, 1), round(x1 / 0.0254, 1), round(2 * ys[int(len(ys) * 0.97)] / 0.0254, 1), round(zs[int(len(zs) * 0.97)] / 0.0254, 1)))
+    print("ZONES %s: %s" % (key, zones))
     for p in obj.data.polygons:
         p.use_smooth = True
     obj.data.set_sharp_from_angle(angle=math.radians(35))

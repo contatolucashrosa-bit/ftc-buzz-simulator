@@ -39,7 +39,23 @@ export interface RobotPreset {
   /** Cores do nosso modelo (estrutura e destaque), inspiradas no material de cada kit. */
   frameColor: number;
   accentColor: number;
+  /**
+   * Zonas de colisão acima do chassi, medidas no CAD do fabricante (scripts/blender/build_robots.py): o robô é
+   * fatiado em trechos ao longo do comprimento, de trás (x negativo) para a frente, cada um com a largura e a
+   * altura do CAD ali. Sem zonas, vale uma torre central.
+   */
+  zones?: CollisionZone[];
 }
+
+/** Trecho do robô em polegadas: de x0 a x1 a partir do centro (frente em +x), com largura e altura. */
+export interface CollisionZone {
+  x0: number;
+  x1: number;
+  width: number;
+  height: number;
+}
+
+const zones = (...rows: Array<[number, number, number, number]>): CollisionZone[] => rows.map(([x0, x1, width, height]) => ({ x0, x1, width, height }));
 
 export const ROBOT_PRESETS: Record<RobotPresetId, RobotPreset> = {
   generic: {
@@ -65,6 +81,7 @@ export const ROBOT_PRESETS: Record<RobotPresetId, RobotPreset> = {
   },
   gobilda: {
     id: "gobilda",
+    zones: zones([-8.9, -3.0, 16.4, 11.0], [-3.0, 3.0, 16.6, 10.2], [3.0, 8.9, 16.4, 6.2]),
     label: "goBILDA Starter Bot",
     description: "6WD drop-center (não anda de lado), intake de rodas Gecko que puxa o POLLEN de dentro da FLOWER, lançador. Até 4 elementos.",
     length: 17.8,
@@ -86,6 +103,7 @@ export const ROBOT_PRESETS: Record<RobotPresetId, RobotPreset> = {
   },
   revDuo: {
     id: "revDuo",
+    zones: zones([-11.1, -3.7, 14.7, 6.4], [-3.7, 3.7, 15.0, 8.5], [3.7, 11.1, 15.2, 8.8]),
     label: "REV DUO Starter Bot",
     description: "Tração tanque por correias, intake, lançador e um servo \"cutucador\" que tira o POLLEN da FLOWER para o chão.",
     length: 18,
@@ -107,6 +125,7 @@ export const ROBOT_PRESETS: Record<RobotPresetId, RobotPreset> = {
   },
   andymark: {
     id: "andymark",
+    zones: zones([-8.8, -2.9, 15.5, 13.4], [-2.9, 2.9, 16.5, 10.4], [2.9, 8.8, 16.1, 6.7]),
     label: "AndyMark Robits Starter Bot",
     description: "Tração tanque com rodas omni e stealth (gira fácil), intake de rodas complacentes, lançador com capô e servo que solta o POLLEN da FLOWER.",
     length: 17.7,

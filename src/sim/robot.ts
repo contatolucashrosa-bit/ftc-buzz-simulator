@@ -144,7 +144,6 @@ export class Robot {
     this.launchExit = { forward: this.halfLength - 2.5, z: preset.height - 1 };
     // encostado no anel do meio (raio externo 2.6 pol), o eixo da FLOWER fica a ~meio comprimento + 2.7 do centro
     this.placeExit = { forward: this.halfLength + 2.7, z: 24.5 };
-    const towerTop = preset.height;
     const p = toWorld(config.start.x, config.start.y, CHASSIS_HEIGHT / 2 + 0.05);
     this.body = physics.world.createRigidBody(
       RAPIER.RigidBodyDesc.dynamic()
@@ -158,14 +157,16 @@ export class Robot {
       RAPIER.ColliderDesc.cuboid(this.halfLength * INCH, (CHASSIS_HEIGHT / 2) * INCH, this.halfWidth * INCH).setMass(chassisMass).setFriction(0.05).setRestitution(0.05),
       this.body,
     );
-    // torre do lançador, no meio do robô
-    physics.world.createCollider(
-      RAPIER.ColliderDesc.cuboid(4 * INCH, ((towerTop - CHASSIS_HEIGHT) / 2) * INCH, 5 * INCH)
-        .setTranslation(0, ((towerTop + CHASSIS_HEIGHT) / 2 - CHASSIS_HEIGHT / 2) * INCH, 0)
-        .setMass(config.massKg - chassisMass)
-        .setFriction(0.1),
-      this.body,
-    );
+    // Acima do chassi: as zonas medidas no CAD (starter bots) ou, sem elas, a torre do lançador no meio do robô.
+    for (const box of this.upperBoxes()) {
+      physics.world.createCollider(
+        RAPIER.ColliderDesc.cuboid((box.length / 2) * INCH, (box.height / 2) * INCH, (box.width / 2) * INCH)
+          .setTranslation(box.x * INCH, (box.height / 2 + CHASSIS_HEIGHT / 2) * INCH, 0)
+          .setMass((config.massKg - chassisMass) / this.upperBoxes().length)
+          .setFriction(0.1),
+        this.body,
+      );
+    }
 
     if (model) this.useCadModel(model);
     else this.buildMesh();
@@ -179,19 +180,43 @@ export class Robot {
     this.sync();
   }
 
+  /**
+   * Caixas de colisão acima do chassi, em polegadas no referencial do robô: centro em x, comprimento, largura e
+   * altura (a partir do topo do chassi).
+   */
+  private upperBoxes(): Array<{ x: number; length: number; width: number; height: number }> {
+    const preset = this.config.preset;
+    const zones = preset.zones;
+    if (!zones?.length) return [{ x: 0, length: 8, width: 10, height: preset.height - CHASSIS_HEIGHT }];
+    // o CAD pode passar do tamanho de largada (peças abertas): as zonas são encaixadas no comprimento do robô
+    const scale = preset.length / (zones[zones.length - 1].x1 - zones[0].x0);
+    const boxes = [];
+    for (const zone of zones) {
+      const x0 = zone.x0 * scale;
+      const x1 = zone.x1 * scale;
+      let top = Math.min(zone.height, preset.height);
+      // a saída do lançador fica livre: a bola nasce ali e não pode começar dentro de um colisor do próprio robô
+      if (this.launchExit.forward > x0 - 1.5 && this.launchExit.forward < x1 + 1.5) top = Math.min(top, this.launchExit.z - 1.6);
+      if (top - CHASSIS_HEIGHT < 0.5) continue;
+      boxes.push({ x: (x0 + x1) / 2, length: x1 - x0, width: Math.min(zone.width, preset.width), height: top - CHASSIS_HEIGHT });
+    }
+    return boxes;
+  }
+
   /** Usa o CAD da equipe como visual; a física continua com a caixa e os mecanismos da variante. */
   private useCadModel(model: THREE.Object3D): void {
     model.position.y = (-CHASSIS_HEIGHT / 2 - 0.05) * INCH;
     this.group.add(model);
     // Sombra: desenhar o CAD inteiro (mais de 100 mil triângulos) no mapa de sombras custava ~5 ms por quadro
-    // com três robôs. Quem projeta a sombra são duas caixas invisíveis, com o tamanho dos colisores.
+    // com três robôs. Quem projeta a sombra são caixas invisíveis, com o tamanho dos colisores.
     model.traverse((node) => (node.castShadow = false));
     const caster = new THREE.MeshBasicMaterial({ colorWrite: false, depthWrite: false });
     const base = new THREE.Mesh(new THREE.BoxGeometry(this.halfLength * 2 * INCH, CHASSIS_HEIGHT * INCH, this.halfWidth * 2 * INCH), caster);
-    const towerHeight = this.config.preset.height - CHASSIS_HEIGHT;
-    const tower = new THREE.Mesh(new THREE.BoxGeometry(8 * INCH, towerHeight * INCH, 10 * INCH), caster);
-    tower.position.y = ((CHASSIS_HEIGHT + towerHeight) / 2) * INCH;
-    for (const box of [base, tower]) {
+    base.castShadow = true;
+    this.group.add(base);
+    for (const zone of this.upperBoxes()) {
+      const box = new THREE.Mesh(new THREE.BoxGeometry(zone.length * INCH, zone.height * INCH, zone.width * INCH), caster);
+      box.position.set(zone.x * INCH, (zone.height / 2 + CHASSIS_HEIGHT / 2) * INCH, 0);
       box.castShadow = true;
       this.group.add(box);
     }
