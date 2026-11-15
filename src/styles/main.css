@@ -459,3 +459,20 @@ h1, h2, .section-title { font-style: italic; font-weight: 900; text-transform: u
 .replay-bar { bottom: var(--toast-bottom, 16px); }
 .help { max-height: calc(100% - var(--toast-bottom, 20px) - 110px); overflow: auto; }
 .ov-teams span { white-space: nowrap; }
+
+/* ---------- Abertura: cartão em blocos sobre curvas de nível (desenho próprio, sem logotipos oficiais) ---------- */
+.splash { position: fixed; inset: 0; z-index: 1000; display: grid; place-items: center; align-content: center; gap: 18px; padding: 20px; background: #063a4a; overflow: hidden; cursor: pointer; transition: opacity 0.45s ease; }
+.splash.leaving { opacity: 0; pointer-events: none; }
+.splash-contours { position: absolute; inset: 0; width: 100%; height: 100%; }
+.splash-card { position: relative; width: min(720px, 100%); display: grid; grid-template-columns: minmax(96px, 24%) 1fr; gap: 6px; padding: 6px; background: #0a0a0a; border-radius: 22px; color: #0a0a0a; animation: splash-in 0.6s cubic-bezier(0.2, 0.9, 0.3, 1.1) both; }
+.splash-card > div { border-radius: 6px; }
+.splash-mark { background: #efe99a; display: grid; place-items: center; padding: 10px; border-radius: 16px 6px 6px 6px !important; }
+.splash-mark svg { width: min(120px, 100%); }
+.splash-context { background: #f0dbb4; display: flex; align-items: center; justify-content: space-evenly; gap: 12px; padding: 14px; text-align: center; font-size: clamp(0.72rem, 1.9vw, 1rem); line-height: 1.25; border-radius: 6px 16px 6px 6px !important; }
+.splash-context strong { font-weight: 900; text-transform: uppercase; }
+.splash-context i { width: 3px; align-self: stretch; background: #0a0a0a; }
+.splash-title { grid-column: 1 / -1; background: #efe99a; text-align: center; font-weight: 900; text-transform: uppercase; font-size: clamp(2.6rem, 11vw, 6.2rem); line-height: 0.92; letter-spacing: -0.03em; padding: 22px 12px; }
+.splash-credit { grid-column: 1 / -1; background: #efe99a; text-align: center; padding: 14px 12px; font-size: clamp(0.72rem, 1.8vw, 0.95rem); text-transform: uppercase; letter-spacing: 0.06em; border-radius: 6px 6px 16px 16px !important; }
+.splash-hint { position: relative; margin: 0; color: #a9c6cf; font-size: 0.82rem; text-align: center; }
+@keyframes splash-in { from { opacity: 0; transform: translateY(18px) scale(0.96); } to { opacity: 1; transform: none; } }
+@media (prefers-reduced-motion: reduce) { .splash-card { animation: none; } .splash { transition: none; } }
