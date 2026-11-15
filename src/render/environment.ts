@@ -12,14 +12,14 @@ type Alliance = "red" | "blue";
 const FIELD_HALF_M = 1.83;
 // ALLIANCE AREA (§9.3): 54 × 97 pol, encostada na parede lateral do campo
 const AREA = { inner: FIELD_HALF_M + 0.05, outer: FIELD_HALF_M + 0.05 + 54 * 0.0254, halfDepth: (97 * 0.0254) / 2 };
-const SKY_TOP = new THREE.Color(0x8fb0cc);
-const SKY_HORIZON = new THREE.Color(0xc7d2d4);
+const SKY_TOP = new THREE.Color(0x6f8fa6);
+const SKY_HORIZON = new THREE.Color(0x8d9c94);
 /** Neblina esverdeada: a floresta ao longe vira uma parede escura e suave, como no vídeo. */
-const HAZE = 0x9aa79a;
+const HAZE = 0x5c6e60;
 
 /** Macacões das equipes: cor do tecido, chapéu e luvas/botas por aliança. */
 const SUIT: Record<Alliance, { cloth: number; hat: number; trim: number }> = {
-  red: { cloth: 0xd9a2a8, hat: 0xe0607e, trim: 0xd0546f },
+  red: { cloth: 0xd77f8c, hat: 0xc9506a, trim: 0xb8405c },
   blue: { cloth: 0xa4a9dc, hat: 0x7f85d6, trim: 0x6f75c8 },
 };
 
@@ -114,8 +114,8 @@ function terrain(rand: () => number, detail: boolean): THREE.Mesh {
   const geometry = new THREE.PlaneGeometry(size, size, 120, 120);
   geometry.rotateX(-Math.PI / 2);
   const colors: number[] = [];
-  const meadow = new THREE.Color(0x24481a);
-  const shade = new THREE.Color(0x173312);
+  const meadow = new THREE.Color(0x1d3b17);
+  const shade = new THREE.Color(0x11280e);
   const c = new THREE.Color();
   const pos = geometry.attributes.position;
   for (let i = 0; i < pos.count; i++) {
@@ -370,7 +370,7 @@ export class Environment {
     const rand = seeded(24823);
 
     scene.background = SKY_HORIZON.clone();
-    scene.fog = new THREE.Fog(HAZE, 22, quality === "low" ? 55 : 75);
+    scene.fog = new THREE.Fog(HAZE, 15, quality === "low" ? 55 : 75);
     this.group.add(skyDome(), terrain(rand, detail.grassDetail));
     this.group.add(forest(detail.trees, rand), ferns(detail.ferns, rand), bushes(detail.bushes, rand), mushrooms(detail.mushrooms, rand), wildflowers(detail.flowers, rand));
 

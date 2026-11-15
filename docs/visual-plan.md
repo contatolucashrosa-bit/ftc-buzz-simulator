@@ -88,3 +88,11 @@
   ```
 
   O segundo comando precisa do `blender` no PATH (testado no Blender 5.3).
+
+- **Starter bots com o CAD oficial (15/11/2026):**
+  - os bots e os presets goBILDA, REV DUO e AndyMark Robits passam a usar o CAD do fabricante como visual, nos presets Médio e Alto. O script `scripts/blender/build_robots.py` orienta cada CAD (frente em +X, piso em zero), simplifica para ~110 mil triângulos e exporta `public/models/robots/<preset>.glb` (5 a 6 MB cada, fora do git);
+  - abaixo de ~100 mil triângulos as chapas furadas dos kits se desfazem, por isso o limite. A sombra de um robô com CAD vem de duas caixas invisíveis do tamanho dos colisores, para o CAD não ser redesenhado no mapa de sombras;
+  - a física não mudou: caixa do chassi + torre, com as medidas do preset;
+  - gerar: `npm run cad:convert` para cada STEP (ver `docs/cad-import.md`) e depois `npm run robots:models`.
+- **Cenário mais próximo do vídeo (15/11/2026):** céu, neblina e gramado mais escuros e a neblina começando mais perto; macacão da aliança vermelha num rosa mais forte.
+- **Interface (15/11/2026):** títulos em itálico pesado, faixa vermelha, laranja e azul no topo, botões inclinados e painéis do HUD com borda laranja. Menu de pausa novo, com placar e relógio. Com dois jogadores, a aliança tem 30 s de pausa para a partida inteira: o tempo corre com o menu aberto, pode ser usado em várias pausas e a partida volta sozinha quando acaba.
