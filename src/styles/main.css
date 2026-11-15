@@ -476,3 +476,10 @@ h1, h2, .section-title { font-style: italic; font-weight: 900; text-transform: u
 .splash-hint { position: relative; margin: 0; color: #a9c6cf; font-size: 0.82rem; text-align: center; }
 @keyframes splash-in { from { opacity: 0; transform: translateY(18px) scale(0.96); } to { opacity: 1; transform: none; } }
 @media (prefers-reduced-motion: reduce) { .splash-card { animation: none; } .splash { transition: none; } }
+
+/* Contagem antes da partida */
+.countdown { position: absolute; inset: 0; display: grid; place-items: center; pointer-events: auto; background: radial-gradient(circle, rgba(0, 0, 0, 0.35), rgba(0, 0, 0, 0.6)); }
+.countdown span { font-weight: 900; font-style: italic; text-transform: uppercase; color: #fff; font-size: clamp(2.4rem, 9vw, 5rem); text-shadow: 0 6px 0 rgba(0, 0, 0, 0.45); }
+.countdown span.pop { font-size: clamp(7rem, 30vw, 17rem); color: var(--ftc-orange); animation: count-pop 0.9s ease-out both; }
+@keyframes count-pop { from { transform: scale(1.5); opacity: 0.2; } 25% { transform: scale(1); opacity: 1; } to { transform: scale(0.92); opacity: 0.85; } }
+@media (prefers-reduced-motion: reduce) { .countdown span.pop { animation: none; } }

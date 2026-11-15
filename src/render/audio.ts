@@ -8,11 +8,14 @@ const MAX_IMPACTS_PER_SECOND = 14;
 export type Buzzer = "start" | "teleop" | "endgame" | "end";
 
 /** Momentos da partida que têm som próprio nos eventos (os mesmos avisos do sistema de placar oficial). */
-export type MatchCue = "matchStart" | "autoEnd" | "controllers" | "countdown" | "teleopStart" | "midMatch" | "endgameWarning" | "matchEnd" | "results";
+export type MatchCue = "preMatch" | "abort" | "unmute" | "matchStart" | "autoEnd" | "controllers" | "countdown" | "teleopStart" | "midMatch" | "endgameWarning" | "matchEnd" | "results";
 
 // Sons de partida do FTC Live, copiados da instalação local por scripts/ftclive-sounds.mjs (ficam fora do git).
 // Sem os arquivos, cada momento cai na buzina sintetizada correspondente (ou em silêncio, nos avisos de voz).
 const CUE_FILES: Record<MatchCue, string> = {
+  preMatch: "countdown",
+  abort: "foghorn",
+  unmute: "unmute",
   matchStart: "charge",
   autoEnd: "endauto",
   controllers: "controllers",
@@ -23,6 +26,19 @@ const CUE_FILES: Record<MatchCue, string> = {
   matchEnd: "endmatch",
   results: "results",
 };
+const cueUrl = (file: string) => `${import.meta.env.BASE_URL}sounds/ftclive/${file}.flac`;
+
+/**
+ * Buzina de partida abortada. Toca fora do SoundBoard porque o jogo (e o áudio dele) é desmontado na mesma hora.
+ */
+export function playAbortSound(): void {
+  const audio = new Audio(cueUrl(CUE_FILES.abort));
+  audio.volume = 0.7;
+  audio.play().catch(() => {
+    // sem o arquivo neste aparelho: sai em silêncio
+  });
+}
+
 const CUE_FALLBACK: Partial<Record<MatchCue, Buzzer>> = { matchStart: "start", autoEnd: "end", teleopStart: "teleop", midMatch: "endgame", endgameWarning: "endgame", matchEnd: "end" };
 
 export class SoundBoard {
@@ -30,6 +46,9 @@ export class SoundBoard {
   private master: GainNode | null = null;
   private noise: AudioBuffer | null = null;
   private readonly samples = new Map<MatchCue, AudioBuffer>();
+  private readonly files = new Map<MatchCue, Promise<ArrayBuffer | null>>();
+  private decoding: Promise<void> | null = null;
+  private decoded = false;
   private impactBudget = MAX_IMPACTS_PER_SECOND;
   private lastBudgetAt = 0;
   muted: boolean;
@@ -43,6 +62,7 @@ export class SoundBoard {
       // sem armazenamento: começa com som
     }
     this.muted = muted;
+    this.fetchSamples();
     // o navegador só libera áudio depois de um gesto do usuário
     window.addEventListener("pointerdown", this.unlock);
     window.addEventListener("keydown", this.unlock);
@@ -51,6 +71,7 @@ export class SoundBoard {
   toggleMute(): boolean {
     this.muted = !this.muted;
     if (this.master) this.master.gain.value = this.muted ? 0 : 0.7;
+    if (!this.muted) this.cue("unmute");
     try {
       localStorage.setItem(PREFS_KEY, this.muted ? "muted" : "on");
     } catch {
@@ -74,7 +95,7 @@ export class SoundBoard {
       this.master = this.ctx.createGain();
       this.master.gain.value = this.muted ? 0 : 0.7;
       this.master.connect(this.ctx.destination);
-      this.loadSamples(this.ctx);
+      this.decoding = this.decodeSamples(this.ctx).then(() => void (this.decoded = true));
       // 1 s de ruído branco, reaproveitado por todos os sons de impacto e torcida
       const buffer = this.ctx.createBuffer(1, this.ctx.sampleRate, this.ctx.sampleRate);
       const data = buffer.getChannelData(0);
@@ -85,24 +106,43 @@ export class SoundBoard {
     return this.ctx;
   }
 
-  /** Carrega os sons de partida, se existirem neste aparelho. */
-  private loadSamples(ctx: AudioContext): void {
+  /**
+   * Busca os sons de partida, se existirem neste aparelho. A busca começa já na criação (não depende de gesto);
+   * a decodificação fica para quando o áudio é liberado.
+   */
+  private fetchSamples(): void {
     for (const [cue, file] of Object.entries(CUE_FILES) as Array<[MatchCue, string]>) {
-      fetch(`${import.meta.env.BASE_URL}sounds/ftclive/${file}.flac`)
-        .then((r) => (r.ok ? r.arrayBuffer() : null))
-        .then((data) => {
+      this.files.set(
+        cue,
+        fetch(cueUrl(file))
+          .then((r) => (r.ok ? r.arrayBuffer() : null))
           // "fLaC" no início: sem o arquivo, o servidor pode devolver a página do app no lugar
-          if (!data || new TextDecoder().decode(data.slice(0, 4)) !== "fLaC") return;
-          return ctx.decodeAudioData(data).then((buffer) => void this.samples.set(cue, buffer));
-        })
-        .catch(() => {
-          // sem o arquivo ou sem suporte a FLAC: fica a buzina sintetizada
-        });
+          .then((data) => (data && new TextDecoder().decode(data.slice(0, 4)) === "fLaC" ? data : null))
+          .catch(() => null),
+      );
     }
+  }
+
+  private decodeSamples(ctx: AudioContext): Promise<void> {
+    return Promise.all(
+      [...this.files].map(([cue, pending]) =>
+        pending
+          .then((data) => (data ? ctx.decodeAudioData(data) : null))
+          .then((buffer) => void (buffer && this.samples.set(cue, buffer)))
+          .catch(() => {
+            // sem suporte a FLAC: fica a buzina sintetizada
+          }),
+      ),
+    ).then(() => undefined);
   }
 
   /** Som de um momento da partida; `delay` em segundos. */
   cue(kind: MatchCue, delay = 0): void {
+    // o primeiro som pode ser pedido no mesmo clique que libera o áudio: espera a decodificação terminar
+    if (!this.decoded) {
+      void this.decoding?.then(() => this.cue(kind, delay));
+      return;
+    }
     const ctx = this.ready();
     if (!ctx) return;
     const sample = this.samples.get(kind);

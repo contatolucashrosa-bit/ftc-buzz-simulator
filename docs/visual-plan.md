@@ -106,3 +106,4 @@
   - Os arquivos são da *FIRST* e **não vão para o repositório**: `npm run sounds:ftclive` copia da instalação local do FTC Live (precisa estar aberto; usuário padrão `local`) para `public/sounds/ftclive/`.
   - Sem os arquivos, valem as buzinas sintetizadas; os avisos de voz ficam em silêncio.
   - Suposição: o `windchimes` toca quando as FLOWERS são liberadas e o `whistle` nos 30 s finais; no FTC Live eles se chamam aviso de meio de partida e aviso de fim de partida, e o instante exato não foi conferido numa partida oficial.
+  - Os outros três sons também entraram: `countdown` na contagem antes da partida (voz e 3-2-1 na tela, com a largada a 4,9 s, no tempo das batidas do próprio áudio), `foghorn` quando a partida é abortada (reiniciar ou sair no meio) e `unmute` ao religar o som.

@@ -8,6 +8,7 @@ import { robotPreset } from "../config/robotPresets";
 import type { AllianceScore } from "../scoring/scoring";
 import { previousBest, rankTeams, recordFromScore, saveRecord } from "../match/history";
 import { REPLAY_SECONDS } from "../game/replay";
+import { playAbortSound } from "../render/audio";
 
 /** Tempo total de pausa por aliança numa partida com dois jogadores. */
 const PAUSE_BUDGET_S = 30;
@@ -276,6 +277,7 @@ export async function mountGameScreen(root: HTMLElement, options: GameOptions, a
 
   // Pausa: livre no jogo solo. Com dois jogadores, cada aliança tem 30 s de pausa para a partida inteira
   // (pode pausar várias vezes; o tempo corre enquanto o menu está aberto e a partida volta sozinha no fim).
+  const countdownTimers: number[] = [];
   const timedPause = options.mode === "match" && !!options.bots?.partnerPlayer;
   const pauseLeft = { red: PAUSE_BUDGET_S, blue: PAUSE_BUDGET_S };
   let pauseClock = 0;
@@ -297,6 +299,35 @@ export async function mountGameScreen(root: HTMLElement, options: GameOptions, a
     closeModal();
     game?.setPaused(false);
     showPauseBudget();
+  };
+
+  /** Sair ou reiniciar com a partida em andamento é uma partida abortada: toca a buzina dos eventos. */
+  const abortIfRunning = () => {
+    if (options.mode === "match" && latest?.started && !matchOver && game && !game.sound.muted) playAbortSound();
+  };
+
+  /**
+   * Contagem antes da partida, no tempo do aviso dos eventos: a voz, depois 3, 2, 1 e a largada.
+   * Os instantes vêm do próprio áudio (batidas a 1,9 s, 2,9 s, 3,9 s e 4,9 s).
+   */
+  const preMatchCountdown = () => {
+    if (!game) return;
+    modal.innerHTML = `<div class="countdown" role="status" aria-live="assertive"><span data-count>Preparar</span></div>`;
+    const label = modal.querySelector<HTMLElement>("[data-count]")!;
+    game.sound.cue("preMatch");
+    const steps: Array<[number, string]> = [[1900, "3"], [2900, "2"], [3900, "1"]];
+    for (const [at, text] of steps) {
+      countdownTimers.push(window.setTimeout(() => {
+        label.textContent = text;
+        label.classList.remove("pop");
+        void label.offsetWidth; // reinicia a animação CSS
+        label.classList.add("pop");
+      }, at));
+    }
+    countdownTimers.push(window.setTimeout(() => {
+      closeModal();
+      game?.startMatch();
+    }, 4900));
   };
 
   const pauseMenu = () => {
@@ -327,8 +358,14 @@ export async function mountGameScreen(root: HTMLElement, options: GameOptions, a
           const help = q("[data-help]");
           help.hidden = !help.hidden;
         });
-        el.querySelector('[data-m="restart"]')!.addEventListener("click", () => actions.restart(options));
-        el.querySelector('[data-m="exit"]')!.addEventListener("click", () => actions.exitToHome());
+        el.querySelector('[data-m="restart"]')!.addEventListener("click", () => {
+          abortIfRunning();
+          actions.restart(options);
+        });
+        el.querySelector('[data-m="exit"]')!.addEventListener("click", () => {
+          abortIfRunning();
+          actions.exitToHome();
+        });
         if (!limited) return;
         const label = el.querySelector<HTMLElement>("[data-budget]")!;
         const bar = el.querySelector<HTMLElement>("[data-budget-bar]")!;
@@ -358,8 +395,7 @@ export async function mountGameScreen(root: HTMLElement, options: GameOptions, a
        <button class="btn btn-secondary" data-m="exit">Voltar</button></div>`,
       (el) => {
         el.querySelector('[data-m="go"]')!.addEventListener("click", () => {
-          closeModal();
-          game?.startMatch();
+          preMatchCountdown();
         });
         el.querySelector('[data-m="exit"]')!.addEventListener("click", () => actions.exitToHome());
       },
@@ -596,7 +632,10 @@ export async function mountGameScreen(root: HTMLElement, options: GameOptions, a
   soundBtn.addEventListener("click", () => showSound(game!.toggleMute()));
   const onKey = (e: KeyboardEvent) => {
     if (e.code === "KeyM" && game) showSound(game.toggleMute());
-    if (e.code === "KeyR" && !modal.innerHTML) actions.restart(options);
+    if (e.code === "KeyR" && !modal.innerHTML) {
+      abortIfRunning();
+      actions.restart(options);
+    }
   };
   window.addEventListener("keydown", onKey);
 
@@ -605,6 +644,7 @@ export async function mountGameScreen(root: HTMLElement, options: GameOptions, a
 
   return () => {
     stopPauseClock();
+    countdownTimers.forEach((t) => clearTimeout(t));
     counters.red.dispose();
     counters.blue.dispose();
     window.removeEventListener("keydown", onKey);
