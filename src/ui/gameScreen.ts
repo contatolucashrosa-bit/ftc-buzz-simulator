@@ -13,11 +13,12 @@ import { playAbortSound } from "../render/audio";
 /** Tempo total de pausa por aliança numa partida com dois jogadores. */
 const PAUSE_BUDGET_S = 30;
 
-export type OverlayMode = "broadcast" | "driver" | "hidden";
+export type OverlayMode = "broadcast" | "field" | "driver" | "hidden";
 export type OverlayScale = 0.5 | 0.75 | 1;
 
 const OVERLAY_MODES: Array<{ id: OverlayMode; label: string }> = [
   { id: "broadcast", label: "Transmissão" },
+  { id: "field", label: "Cronômetro grande" },
   { id: "driver", label: "Piloto (compacto)" },
   { id: "hidden", label: "Oculto" },
 ];
@@ -124,6 +125,34 @@ class ScoreCounter {
   dispose(): void {
     cancelAnimationFrame(this.raf);
   }
+}
+
+/**
+ * Revelação do resultado, como nos eventos: as linhas da tabela entram uma a uma, os totais sobem contando e,
+ * no fim, aparece quem venceu. Com "reduzir movimento" ligado ou ao voltar do replay, tudo aparece de uma vez.
+ */
+function revealResults(modal: HTMLElement, alreadyShown: boolean): void {
+  const still = alreadyShown || (window.matchMedia?.("(prefers-reduced-motion: reduce)").matches ?? false);
+  if (still) {
+    modal.classList.add("revealed");
+    return;
+  }
+  const rows = [...modal.querySelectorAll<HTMLElement>(".result-table tbody tr")];
+  rows.forEach((row, i) => row.style.setProperty("--i", String(i)));
+  modal.classList.add("revealing");
+  const totals = [...modal.querySelectorAll<HTMLElement>("[data-total]")];
+  totals.forEach((el) => (el.textContent = "0"));
+  const countStart = performance.now() + rows.length * 110;
+  // temporizador em vez de requestAnimationFrame: com a aba em segundo plano os quadros param, e os botões
+  // do resultado não podem ficar escondidos esperando a animação
+  const timer = window.setInterval(() => {
+    const k = Math.min(1, Math.max(0, (performance.now() - countStart) / 1300));
+    const eased = 1 - Math.pow(1 - k, 3);
+    for (const el of totals) el.textContent = String(Math.round(Number(el.dataset.total) * eased));
+    if (k < 1 && modal.isConnected) return;
+    clearInterval(timer);
+    modal.classList.add("revealed");
+  }, 33);
 }
 
 function resultRows(view: GameView): string {
@@ -411,6 +440,8 @@ export async function mountGameScreen(root: HTMLElement, options: GameOptions, a
     const best = previousBest(history, options.teamNumber, record.id);
     const ranking = rankTeams(history);
     const position = ranking.find((r) => r.team === options.teamNumber);
+    // a revelação animada acontece só na primeira vez (voltar do replay mostra tudo pronto)
+    let resultsRevealed = false;
     const showResults = () => {
       const r = view.score.red;
       const b = view.score.blue;
@@ -418,9 +449,9 @@ export async function mountGameScreen(root: HTMLElement, options: GameOptions, a
       const earned = [r.swarm.achieved && "SWARM", r.pollinator1.achieved && "POLLINATOR 1", r.pollinator2.achieved && "POLLINATOR 2", r.result === "win" && "Vitória (3)", r.result === "tie" && "Empate (1)"].filter(Boolean);
       showModal(
         `<div class="result-hero">
-           <div class="rh-alliance red"><span>Vermelha · ${escapeHtml(options.teamNumber)}</span><strong>${r.total}</strong></div>
+           <div class="rh-alliance red ${r.total > b.total ? "winner" : ""}"><span>Vermelha · ${escapeHtml(options.teamNumber)}</span><strong data-total="${r.total}">${r.total}</strong></div>
            <div class="rh-center"><h2>${headline}</h2>${best === null || r.total > best ? `<span class="rh-record">${best === null ? "Primeira partida registrada" : `Novo recorde! (antes: ${best})`}</span>` : `<span class="rh-sub">Recorde da equipe: ${best}</span>`}</div>
-           <div class="rh-alliance blue"><span>Azul</span><strong>${b.total}</strong></div>
+           <div class="rh-alliance blue ${b.total > r.total ? "winner" : ""}"><span>Azul</span><strong data-total="${b.total}">${b.total}</strong></div>
          </div>
          <div class="rh-rp"><div class="ov-bonus">${bonusHtml(r)}</div><span><strong>${r.rankingPoints} RP</strong> ${earned.length ? escapeHtml(earned.join(" · ")) : "nenhum RP nesta partida"}</span></div>
          ${resultRows(view)}
@@ -435,6 +466,8 @@ export async function mountGameScreen(root: HTMLElement, options: GameOptions, a
         (el) => {
           el.querySelector('[data-m="again"]')!.addEventListener("click", () => actions.restart(options));
           el.querySelector('[data-m="replay"]')!.addEventListener("click", () => openReplay(showResults));
+          revealResults(el.querySelector<HTMLElement>(".modal")!, resultsRevealed);
+          resultsRevealed = true;
           el.querySelector('[data-m="ranking"]')!.addEventListener("click", () => actions.openRanking());
           el.querySelector('[data-m="exit"]')!.addEventListener("click", () => actions.exitToHome());
         },

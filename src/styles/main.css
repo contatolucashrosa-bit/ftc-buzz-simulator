@@ -483,3 +483,23 @@ h1, h2, .section-title { font-style: italic; font-weight: 900; text-transform: u
 .countdown span.pop { font-size: clamp(7rem, 30vw, 17rem); color: var(--ftc-orange); animation: count-pop 0.9s ease-out both; }
 @keyframes count-pop { from { transform: scale(1.5); opacity: 0.2; } 25% { transform: scale(1); opacity: 1; } to { transform: scale(0.92); opacity: 0.85; } }
 @media (prefers-reduced-motion: reduce) { .countdown span.pop { animation: none; } }
+
+/* ---------- Modo "Cronômetro grande": relógio enorme no topo, com os dois placares ao lado (para treinar olhando o tempo) ---------- */
+.overlay[data-mode="field"] { width: min(760px, 100%); }
+.overlay[data-mode="field"] .ov-top, .overlay[data-mode="field"] .ov-stats, .overlay[data-mode="field"] .ov-teams { display: none; }
+.overlay[data-mode="field"] .ov-main { grid-template-columns: 1fr 2.2fr 1fr; height: 132px; border-radius: 0 0 14px 14px; overflow: hidden; opacity: 0.94; }
+.overlay[data-mode="field"] .ov-timer { font-size: 6.4rem; line-height: 1; }
+.overlay[data-mode="field"] .ov-phase { font-size: 0.9rem; }
+.overlay[data-mode="field"] .ov-score { font-size: 3.6rem; }
+.overlay[data-mode="field"] .ov-name { font-size: 0.95rem; }
+
+/* ---------- Resultado animado ---------- */
+.modal.revealing .result-table tbody tr { animation: row-in 0.35s ease-out both; animation-delay: calc(var(--i, 0) * 110ms); }
+.modal.revealing .rh-center, .modal.revealing .rh-rp, .modal.revealing .rh-rank, .modal.revealing .actions { opacity: 0; transition: opacity 0.4s ease; }
+.modal.revealing.revealed .rh-center, .modal.revealing.revealed .rh-rp, .modal.revealing.revealed .rh-rank, .modal.revealing.revealed .actions { opacity: 1; }
+.modal.revealed .rh-alliance.winner { animation: winner-pop 0.7s ease-out; box-shadow: 0 0 0 3px var(--buzz-yellow), 0 0 28px rgba(247, 227, 38, 0.45); }
+.rh-alliance { border-radius: 4px; }
+.rh-alliance strong { font-style: italic; font-size: 3.2rem; }
+.rh-center h2 { font-size: 1.25rem; }
+@keyframes row-in { from { opacity: 0; transform: translateX(-14px); } to { opacity: 1; transform: none; } }
+@keyframes winner-pop { 0% { transform: scale(1); } 40% { transform: scale(1.06); } 100% { transform: scale(1); } }

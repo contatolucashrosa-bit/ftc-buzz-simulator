@@ -107,3 +107,7 @@
   - Sem os arquivos, valem as buzinas sintetizadas; os avisos de voz ficam em silêncio.
   - Suposição: o `windchimes` toca quando as FLOWERS são liberadas e o `whistle` nos 30 s finais; no FTC Live eles se chamam aviso de meio de partida e aviso de fim de partida, e o instante exato não foi conferido numa partida oficial.
   - Os outros três sons também entraram: `countdown` na contagem antes da partida (voz e 3-2-1 na tela, com a largada a 4,9 s, no tempo das batidas do próprio áudio), `foghorn` quando a partida é abortada (reiniciar ou sair no meio) e `unmute` ao religar o som.
+- **Cronômetro grande e resultado animado (15/11/2026):**
+  - novo modo do placar, "Cronômetro grande" (tecla V ou botão Placar): relógio enorme no topo, com os dois placares ao lado;
+  - na tela de resultado, as linhas entram uma a uma, os totais sobem contando e a aliança vencedora é destacada no fim. Ao voltar do replay, ou com "reduzir movimento" ligado, tudo aparece de uma vez;
+  - desenho próprio: as telas equivalentes do FTC Live (modo "field" e resultados) não foram vistas em funcionamento.
