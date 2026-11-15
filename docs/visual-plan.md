@@ -96,3 +96,9 @@
   - gerar: `npm run cad:convert` para cada STEP (ver `docs/cad-import.md`) e depois `npm run robots:models`.
 - **Cenário mais próximo do vídeo (15/11/2026):** céu, neblina e gramado mais escuros e a neblina começando mais perto; macacão da aliança vermelha num rosa mais forte.
 - **Interface (15/11/2026):** títulos em itálico pesado, faixa vermelha, laranja e azul no topo, botões inclinados e painéis do HUD com borda laranja. Menu de pausa novo, com placar e relógio. Com dois jogadores, a aliança tem 30 s de pausa para a partida inteira: o tempo corre com o menu aberto, pode ser usado em várias pausas e a partida volta sozinha quando acaba.
+- **Placar de transmissão (15/11/2026):** refeito na mesma organização da tela da audiência do FTC Live (conferida num evento de treino local): barra no rodapé, vermelha à esquerda, contadores (TIPs rumo ao próximo RP e NECTAR fora do campo), equipes, placar e cronômetro. Tudo desenhado aqui; nenhum logotipo, arte ou som do FTC Live foi copiado.
+- **Zonas de colisão dos starter bots (15/11/2026):** em vez de uma torre central, três caixas ao longo do comprimento, com largura e altura medidas no CAD (`ZONES` na saída do `build_robots.py`, guardadas em `src/config/robotPresets.ts`). A saída do lançador fica livre.
+- **Animações (15/11/2026), todas só visuais:**
+  - o robô inclina ao acelerar e frear e dá um coice curto a cada lançamento;
+  - a HIVE balança no amortecedor por cerca de 1 s depois do TIP;
+  - a aliança comemora o TIP da própria HIVE (braços para cima e pulinhos; o piloto levanta um braço só).

@@ -364,6 +364,7 @@ export class Environment {
   private readonly people: Record<Alliance, AnimatedPerson[]> = { red: [], blue: [] };
   private readonly delivery = {} as Record<Alliance, Delivery>;
   private time = 0;
+  private readonly cheering: Record<Alliance, number> = { red: 0, blue: 0 };
 
   constructor(scene: THREE.Scene, quality: Quality) {
     const detail = DETAIL[quality];
@@ -441,6 +442,11 @@ export class Environment {
   }
 
   /** Pede ao HUMAN PLAYER que entregue um NECTAR; `release` é chamado quando ele o solta na LOADING ZONE. */
+  /** A aliança comemora por alguns instantes (TIP da própria HIVE): braços para cima e pulinhos. */
+  cheer(alliance: Alliance, seconds = 1.8): void {
+    this.cheering[alliance] = seconds;
+  }
+
   requestNectar(alliance: Alliance, release: () => void): void {
     this.delivery[alliance].queue.push(release);
   }
@@ -534,9 +540,22 @@ export class Environment {
   /** `camera`: posição da câmera; quem estiver colado a ela some, para não tapar a tela (câmera do robô). */
   update(dt: number, camera?: THREE.Vector3): void {
     this.time += dt;
-    for (const list of Object.values(this.people)) {
-      for (const p of list) {
+    for (const alliance of ["red", "blue"] as const) {
+      this.cheering[alliance] = Math.max(0, this.cheering[alliance] - dt);
+      for (const p of this.people[alliance]) {
         if (camera) p.root.visible = Math.hypot(camera.x - p.root.position.x, camera.z - p.root.position.z) > 0.9;
+        const cheer = this.cheering[alliance];
+        const delivering = Object.values(this.delivery).some((x) => x.person === p && (x.state !== "idle" || x.queue.length > 0));
+        if (cheer > 0 && !delivering) {
+          // entra e sai suave; o piloto levanta só um braço (o outro segura o controle)
+          const k = Math.min(1, cheer * 4, (1.8 - cheer) * 6 + 0.2);
+          const wave = Math.sin(this.time * 14 + p.phase) * 0.18;
+          p.rightArm.rotation.x = -2.7 * k + wave;
+          p.leftArm.rotation.x = p.role === "driver" ? -0.95 : -2.7 * k - wave;
+          p.root.position.y = Math.abs(Math.sin(this.time * 9 + p.phase)) * 0.09 * k;
+          continue;
+        }
+        if (p.root.position.y > 0.01) p.root.position.y = 0;
         if (p.role === "driver") {
           // pequenos ajustes no controle
           p.rightArm.rotation.x = -0.95 + Math.sin(this.time * 3 + p.phase) * 0.04;

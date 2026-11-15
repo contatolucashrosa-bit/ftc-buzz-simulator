@@ -104,6 +104,9 @@ function signTexture(teamNumber: string, color: number): THREE.CanvasTexture {
   return texture;
 }
 
+const LEAN = new THREE.Quaternion();
+const LEAN_AXIS = new THREE.Vector3(0, 0, 1);
+
 export class Robot {
   readonly body: RAPIER.RigidBody;
   readonly group = new THREE.Group();
@@ -127,6 +130,10 @@ export class Robot {
   /** Direção em que o comando atual tenta levar o robô, no campo (-1..1), para a falta de PIN. */
   push = { x: 0, y: 0 };
   private servoCooldown = 0;
+  private animClock = performance.now();
+  private animSpeed = 0;
+  private animPitch = 0;
+  private recoil = 0;
 
   constructor(
     readonly config: RobotConfig,
@@ -523,6 +530,7 @@ export class Robot {
     e.lastLaunchedBy = this.config.alliance;
     e.launch = this.pose();
     this.cooldown = this.config.launchIntervalS;
+    this.recoil = 1;
     this.onLaunch?.();
     return kind;
   }
@@ -610,11 +618,31 @@ export class Robot {
     this.trajectory.visible = visible;
   }
 
+  /**
+   * Animação só visual (os colisores não mexem): o robô "afunda" a frente ao frear e levanta ao acelerar, como a
+   * suspensão de um robô real nos TILES de espuma, e dá um coice curto a cada lançamento.
+   */
+  private animateBody(): void {
+    const now = performance.now();
+    const dt = Math.min(0.1, Math.max(0.001, (now - this.animClock) / 1000));
+    this.animClock = now;
+    const v = this.body.linvel();
+    const forward = new THREE.Vector3(1, 0, 0).applyQuaternion(this.group.quaternion);
+    const speed = v.x * forward.x + v.z * forward.z;
+    const accel = (speed - this.animSpeed) / dt;
+    this.animSpeed = speed;
+    const target = THREE.MathUtils.clamp(accel * 0.009, -0.05, 0.05) + this.recoil * 0.045;
+    this.animPitch += (target - this.animPitch) * Math.min(1, dt * 14);
+    this.recoil = Math.max(0, this.recoil - dt * 7);
+    if (Math.abs(this.animPitch) > 1e-4) this.group.quaternion.multiply(LEAN.setFromAxisAngle(LEAN_AXIS, this.animPitch));
+  }
+
   sync(showTrajectory = true): void {
     const t = this.body.translation();
     const r = this.body.rotation();
     this.group.position.set(t.x, t.y, t.z);
     this.group.quaternion.set(r.x, r.y, r.z, r.w);
+    this.animateBody();
 
     const kindColor: Record<ElementKind, number> = { pollen: 0xf7e326, redNectar: 0xed1c24, blueNectar: 0x0066b3 };
     for (let i = 0; i < RULES.maxControlledElements; i++) {

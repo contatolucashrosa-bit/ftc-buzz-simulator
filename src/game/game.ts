@@ -855,6 +855,7 @@ export class Game {
         this.tips[alliance][isAuto ? "auto" : "teleop"]++;
         this.flash(`HIVE ${alliance === "red" ? "vermelha" : "azul"} virou! +${RULES.points.teleopHiveTip} pontos e +1 NECTAR liberado`);
         this.sound.tip();
+        this.environment.cheer(alliance);
       }
     }
 

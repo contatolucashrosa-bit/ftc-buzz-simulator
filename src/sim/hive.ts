@@ -104,6 +104,8 @@ export class Hive {
   private readonly body: RAPIER.RigidBody;
   private readonly pivot: THREE.Vector3;
   private readonly inverse = new THREE.Quaternion();
+  /** Tempo desde o último TIP (s); começa alto para a HIVE nascer parada. */
+  private settle = 10;
 
   constructor(
     readonly alliance: Alliance,
@@ -206,6 +208,8 @@ export class Hive {
       0,
     );
     const tipped = this.logic.step(dt, mass);
+    // depois do TIP a HIVE balança um pouco no amortecedor (só no visual)
+    this.settle = tipped ? 0 : this.settle + dt;
     this.body.setNextKinematicRotation(quatAboutX(this.logic.angle));
     return tipped;
   }
@@ -216,8 +220,9 @@ export class Hive {
     this.group.add(model);
   }
 
-  syncVisual(angle = this.logic.angle): void {
-    const q = quatAboutX(angle);
+  syncVisual(angle?: number): void {
+    const wobble = angle === undefined && this.settle < 1.2 ? 0.03 * this.logic.upSide * Math.exp(-5 * this.settle) * Math.sin(26 * this.settle) : 0;
+    const q = quatAboutX((angle ?? this.logic.angle) + wobble);
     this.group.quaternion.set(q.x, q.y, q.z, q.w);
   }
 }
