@@ -12,3 +12,5 @@ am-58*.pdf
 *.STEP
 *.step
 *.zip
+# Modelos da arena gerados a partir do CAD oficial (npm run field:models): mesma dúvida de redistribuição
+public/models/field/

@@ -68,3 +68,23 @@
   - a câmera da plateia ficou mais longe e com lente mais fechada, como numa transmissão.
 
   Custo (RTX 4060, janela de ~575 × 534): Médio 5,7 ms; Alto 10,5 ms, com o GTAO em meia resolução (em resolução cheia passava de 14 ms, porque o GTAO redesenha o cenário inteiro).
+
+- **Arena com as peças do CAD oficial (15/11/2026):**
+  - a HIVE, a estrutura das HIVEs e as FLOWERS passaram a usar modelos montados no **Blender** com as peças reais do CAD da AndyMark (am-5850): molduras das CELLS, tubos e chapas do pivô, pernas, barra e suportes do eixo, anéis e canos das FLOWERS;
+  - o CAD vem como peças soltas, sem a posição de montagem. O script `scripts/blender/build_field.py` posiciona cada uma com as medidas do manual (§9.6 e §9.7), simplifica (de ~1,9 milhão para ~43 mil triângulos no total) e exporta três GLBs (`hive`, `hive-frame`, `flower`; 1,5 MB somados);
+  - geradas no script, por serem simples ou por não encaixarem sem a montagem: chapas de policarbonato das CELLS, travessas, canto de cima da estrutura, pés, painel e batente da FLOWER. O painel usa favos próprios, sem a arte oficial;
+  - a colisão da estrutura foi refeita com a geometria real: pernas que abrem dos cantos de cima (perto de cada pivô) até os pés e travessa de 24 pol (antes, pernas retas e uma travessa de 49 pol);
+  - os modelos são só visuais e entram nos presets Médio e Alto. No Baixo, ou sem os arquivos, o jogo usa as peças geradas no código;
+  - custo no preset Alto (RTX 4060, 1024 × 768): 6,9 ms por quadro, com 289 mil triângulos na cena.
+
+  Como gerar (o CAD e os GLBs ficam fora do git, porque a redistribuição não foi confirmada):
+
+  ```bash
+  npm run field:parts
+  ```
+
+  ```bash
+  npm run field:models
+  ```
+
+  O segundo comando precisa do `blender` no PATH (testado no Blender 5.3).

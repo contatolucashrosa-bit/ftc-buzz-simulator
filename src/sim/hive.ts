@@ -210,6 +210,12 @@ export class Hive {
     return tipped;
   }
 
+  /** Troca as peças geradas no código pelo modelo detalhado (origem no pivô). */
+  setModel(model: THREE.Object3D): void {
+    this.group.clear();
+    this.group.add(model);
+  }
+
   syncVisual(angle = this.logic.angle): void {
     const q = quatAboutX(angle);
     this.group.quaternion.set(q.x, q.y, q.z, q.w);

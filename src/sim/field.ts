@@ -103,7 +103,12 @@ function floorTexture(): { map: THREE.CanvasTexture; bump: THREE.CanvasTexture }
   return { map, bump: new THREE.CanvasTexture(bumpCanvas) };
 }
 
-export function buildField(physics: PhysicsWorld, scene: THREE.Scene): void {
+export interface FieldVisuals {
+  /** Estrutura das HIVEs: começa com as peças geradas no código; o jogo pode trocar pelo modelo detalhado. */
+  hiveFrame: THREE.Group;
+}
+
+export function buildField(physics: PhysicsWorld, scene: THREE.Scene): FieldVisuals {
   const size = FIELD.half * 2 * INCH;
   const ground = physics.world.createRigidBody(RAPIER.RigidBodyDesc.fixed());
 
@@ -171,55 +176,61 @@ export function buildField(physics: PhysicsWorld, scene: THREE.Scene): void {
     scene.add(foot);
   }
 
-  buildHiveFrame(physics, scene, ground);
+  return { hiveFrame: buildHiveFrame(physics, scene, ground) };
 }
 
-/** Estrutura triangular da HIVE (§9.6.1, Fig. 9-8): dois "A" ligados por uma travessa no topo. */
-function buildHiveFrame(physics: PhysicsWorld, scene: THREE.Scene, ground: RAPIER.RigidBody): void {
+/**
+ * Estrutura das HIVEs (§9.6.1, Fig. 9-8): dois "A" ligados por uma travessa de 24 pol no topo. As pernas saem
+ * dos cantos de cima (perto de cada pivô) e abrem até os pés, nos cantos da base de 49,46 × 38,95 pol.
+ * Medidas dos cantos e da travessa: CAD oficial (am-5874, am-5875, am-5876).
+ */
+function buildHiveFrame(physics: PhysicsWorld, scene: THREE.Scene, ground: RAPIER.RigidBody): THREE.Group {
+  const group = new THREE.Group();
   const mat = new THREE.MeshStandardMaterial({ color: 0x6f7278, metalness: 0.6, roughness: 0.4 });
-  const halfDepth = HIVE.frameDepth / 2;
-  const apex = HIVE.pivotHeight + 1.5;
-  const legLength = Math.hypot(halfDepth, apex);
-  const legAngle = Math.atan2(halfDepth, apex);
-  const side = 0.75; // meia-seção da barra (pol)
+  const dark = new THREE.MeshStandardMaterial({ color: 0x1b1c1f, roughness: 0.5 });
+  const half = 0.5; // perfil de 1 pol
+  const cornerZ = 39.6;
+  const footX = HIVE.frameWidth / 2 - 1;
+  const footY = HIVE.frameDepth / 2 - 1;
+  const up = new THREE.Vector3(0, 1, 0);
 
-  for (const x of [-HIVE.frameWidth / 2, HIVE.frameWidth / 2]) {
-    for (const dir of [-1, 1]) {
-      // perna inclinada de (y = dir·halfDepth, z = 0) até (y = 0, z = apex)
-      const center = toWorld(x, (dir * halfDepth) / 2, apex / 2);
-      // inclinação no plano y-z do manual = rotação em torno do X do mundo
-      const q = new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(1, 0, 0), dir * legAngle);
+  const addBox = (center: THREE.Vector3, hx: number, hy: number, hz: number, q: THREE.Quaternion, material: THREE.Material, solid = true) => {
+    if (solid) {
       physics.world.createCollider(
-        RAPIER.ColliderDesc.cuboid(side * INCH, (legLength / 2) * INCH, side * INCH)
-          .setTranslation(center.x, center.y, center.z)
-          .setRotation({ x: q.x, y: q.y, z: q.z, w: q.w }),
+        RAPIER.ColliderDesc.cuboid(hx * INCH, hy * INCH, hz * INCH).setTranslation(center.x, center.y, center.z).setRotation({ x: q.x, y: q.y, z: q.z, w: q.w }),
         ground,
       );
-      const leg = new THREE.Mesh(new THREE.BoxGeometry(side * 2 * INCH, legLength * INCH, side * 2 * INCH), mat);
-      leg.position.copy(center);
-      leg.quaternion.copy(q);
-      leg.castShadow = true;
-      scene.add(leg);
     }
-    // barra de base (só visual: fica rente ao piso, presa por baixo dos TILES)
-    const base = new THREE.Mesh(new THREE.BoxGeometry(side * 2 * INCH, 0.4 * INCH, HIVE.frameDepth * INCH), mat);
-    base.position.copy(toWorld(x, 0, 0.2));
-    scene.add(base);
-  }
-  // travessa do topo, ao longo de x, na altura dos pivôs
-  const bar = new THREE.Mesh(new THREE.BoxGeometry(HIVE.frameWidth * INCH, 1.5 * INCH, 1.5 * INCH), mat);
-  bar.position.copy(toWorld(0, 0, apex));
-  scene.add(bar);
-  physics.world.createCollider(
-    RAPIER.ColliderDesc.cuboid((HIVE.frameWidth / 2) * INCH, 0.75 * INCH, 0.75 * INCH).setTranslation(bar.position.x, bar.position.y, bar.position.z),
-    ground,
-  );
+    const mesh = new THREE.Mesh(new THREE.BoxGeometry(hx * 2 * INCH, hy * 2 * INCH, hz * 2 * INCH), material);
+    mesh.position.copy(center);
+    mesh.quaternion.copy(q);
+    mesh.castShadow = true;
+    group.add(mesh);
+  };
+  const none = new THREE.Quaternion();
 
-  // Painel amarelo genérico no frame (o painel oficial tem o logotipo, que não reproduzimos).
-  const panel = new THREE.Mesh(
-    new THREE.BoxGeometry(HIVE.frameWidth * 0.55 * INCH, 6 * INCH, 0.3 * INCH),
-    new THREE.MeshStandardMaterial({ color: 0xf7e326, roughness: 0.6 }),
-  );
-  panel.position.copy(toWorld(0, 0, apex + 5));
-  scene.add(panel);
+  for (const sx of [-1, 1]) {
+    for (const sy of [-1, 1]) {
+      const top = toWorld(sx * 12.6, sy * 0.8, cornerZ - 0.3);
+      const foot = toWorld(sx * footX, sy * footY, 1.6);
+      const q = new THREE.Quaternion().setFromUnitVectors(up, foot.clone().sub(top).normalize());
+      addBox(top.clone().add(foot).multiplyScalar(0.5), half, top.distanceTo(foot) / INCH / 2, half, q, mat);
+      addBox(toWorld(sx * footX, sy * footY, 1.05), 1.15, 1.05, 1.15, none, dark);
+    }
+    // canto de cima (segura as pernas, a travessa e o eixo da HIVE)
+    addBox(toWorld(sx * 12.6, 0, cornerZ + 0.4), 1.6, 2.35, 1.7, none, dark);
+    // barra de base (só visual: fica rente ao piso, presa por baixo dos TILES)
+    addBox(toWorld(sx * footX, 0, 1), half, 1, HIVE.frameDepth / 2, none, mat, false);
+  }
+  // travessa do topo, ao longo de x, entre os dois cantos
+  addBox(toWorld(0, 0, cornerZ), 12, half, half, none, mat);
+
+  // Painel amarelo genérico de cada lado (o painel oficial tem o logotipo, que não reproduzimos).
+  const lean = Math.atan2(footY - 0.8, cornerZ - 1.9);
+  for (const sy of [-1, 1]) {
+    const q = new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(1, 0, 0), sy * lean);
+    addBox(toWorld(0, sy * 5.6, 30.4), 15.08, 3.23, 0.06, q, new THREE.MeshStandardMaterial({ color: 0xf7e326, roughness: 0.6 }), false);
+  }
+  scene.add(group);
+  return group;
 }

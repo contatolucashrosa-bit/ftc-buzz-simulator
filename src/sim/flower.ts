@@ -10,6 +10,8 @@ import { COLLISION, RAPIER, interactionGroups, type PhysicsWorld } from "./physi
 const CAGE_RADIUS = FLOWER.topOpeningRadius + FLOWER.pipeRadius; // eixo dos canos
 
 export class Flower {
+  private readonly group = new THREE.Group();
+
   constructor(
     readonly spec: FlowerSpec,
     physics: PhysicsWorld,
@@ -21,7 +23,7 @@ export class Flower {
     const darkMaterial = new THREE.MeshStandardMaterial({ color: 0x26272b, roughness: 0.55, metalness: 0.2 });
     const topMaterial = new THREE.MeshStandardMaterial({ color: 0xf2c31b, roughness: 0.45 });
     const backstopMaterial = new THREE.MeshStandardMaterial({ color: 0x8a3fc4, roughness: 0.5 });
-    const group = new THREE.Group();
+    const group = this.group;
     const base = toWorld(spec.x, spec.y, 0);
     group.position.copy(base);
     scene.add(group);
@@ -104,6 +106,14 @@ export class Flower {
       wallYaw,
       backstopMaterial,
     );
+  }
+
+  /** Troca as peças geradas no código pelo modelo detalhado (origem no piso, no eixo; parede em +y do modelo). */
+  setModel(model: THREE.Object3D): void {
+    // gira o modelo até o lado da parede apontar para fora do campo
+    model.rotation.y = Math.atan2(-this.spec.inward.y, -this.spec.inward.x) - Math.PI / 2;
+    this.group.clear();
+    this.group.add(model);
   }
 
   /** Elemento ao menos parcialmente no volume de pontuação (§10.5.2): entre o anel do meio e o do topo. */

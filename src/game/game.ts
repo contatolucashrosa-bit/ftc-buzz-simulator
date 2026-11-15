@@ -5,6 +5,7 @@ import { RULES, type Alliance } from "../rules/rules";
 import { clockAt, formatClock, matchDuration, nectarAllowance, type ClockState } from "../match/clock";
 import { computeScore, emptySnapshot, type MatchScore, type MatchSnapshot } from "../scoring/scoring";
 import { Controls, type ControlState } from "../input/controls";
+import { loadFieldModels } from "../render/fieldModels";
 import { Stage, QUALITY_SETTINGS, CAMERA_LABELS, type Quality } from "../render/stage";
 import { RAPIER, createWorld, initPhysics, yawOf, type PhysicsWorld } from "../sim/physics";
 import { buildField, ALLIANCE_COLORS } from "../sim/field";
@@ -184,6 +185,7 @@ const PHASE_LABELS = { pre: "Pronto", auto: "AUTO", transition: "Transição", t
 
 export class Game {
   private readonly stage: Stage;
+  private disposed = false;
   private readonly physics: PhysicsWorld;
   private readonly elements: ElementManager;
   private readonly hives: Record<Alliance, Hive>;
@@ -254,7 +256,7 @@ export class Game {
     const quality = QUALITY_SETTINGS[options.quality];
     this.stage = new Stage(container, options.quality, "red");
     this.physics = createWorld(1 / quality.physicsHz);
-    buildField(this.physics, this.stage.scene);
+    const field = buildField(this.physics, this.stage.scene);
     this.environment = new Environment(this.stage.scene, options.quality);
     this.elements = new ElementManager(this.physics, this.stage.scene, quality.sphereSegments);
     this.hives = {
@@ -262,6 +264,17 @@ export class Game {
       blue: new Hive("blue", this.physics, this.stage.scene, ALLIANCE_COLORS.blue),
     };
     this.flowers = FLOWERS.map((spec) => new Flower(spec, this.physics, this.stage.scene));
+    // Modelos detalhados da arena (médio e alto): entram quando terminam de carregar; sem eles, ficam as peças do código.
+    if (options.quality !== "low") {
+      void loadFieldModels().then((models) => {
+        if (!models || this.disposed) return;
+        this.hives.red.setModel(models.hive(ALLIANCE_COLORS.red));
+        this.hives.blue.setModel(models.hive(ALLIANCE_COLORS.blue));
+        for (const flower of this.flowers) flower.setModel(models.flower());
+        field.hiveFrame.clear();
+        field.hiveFrame.add(models.hiveFrame());
+      });
+    }
     this.robot = new Robot(
       { ...robotConfigFromPreset(withCadSize(robotPreset(options.robotPreset), cad)), alliance: "red", teamNumber: options.teamNumber, start: RED_START, launchIntervalS: options.launchIntervalS },
       this.physics,
@@ -1137,6 +1150,7 @@ export class Game {
   static readonly duration = matchDuration();
 
   dispose(): void {
+    this.disposed = true;
     cancelAnimationFrame(this.raf);
     if (this.javaBus) this.javaBus.state = 2;
     this.gamepads?.dispose();
