@@ -183,6 +183,18 @@ export class Robot {
   private useCadModel(model: THREE.Object3D): void {
     model.position.y = (-CHASSIS_HEIGHT / 2 - 0.05) * INCH;
     this.group.add(model);
+    // Sombra: desenhar o CAD inteiro (mais de 100 mil triângulos) no mapa de sombras custava ~5 ms por quadro
+    // com três robôs. Quem projeta a sombra são duas caixas invisíveis, com o tamanho dos colisores.
+    model.traverse((node) => (node.castShadow = false));
+    const caster = new THREE.MeshBasicMaterial({ colorWrite: false, depthWrite: false });
+    const base = new THREE.Mesh(new THREE.BoxGeometry(this.halfLength * 2 * INCH, CHASSIS_HEIGHT * INCH, this.halfWidth * 2 * INCH), caster);
+    const towerHeight = this.config.preset.height - CHASSIS_HEIGHT;
+    const tower = new THREE.Mesh(new THREE.BoxGeometry(8 * INCH, towerHeight * INCH, 10 * INCH), caster);
+    tower.position.y = ((CHASSIS_HEIGHT + towerHeight) / 2) * INCH;
+    for (const box of [base, tower]) {
+      box.castShadow = true;
+      this.group.add(box);
+    }
     // ROBOT SIGN (R401–R403) por fora do modelo, nas laterais
     const sign = new THREE.MeshStandardMaterial({ map: signTexture(this.config.teamNumber, ALLIANCE_COLORS[this.config.alliance]) });
     for (const side of [-1, 1]) {

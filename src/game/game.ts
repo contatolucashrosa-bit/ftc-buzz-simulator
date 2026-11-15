@@ -6,6 +6,7 @@ import { clockAt, formatClock, matchDuration, nectarAllowance, type ClockState }
 import { computeScore, emptySnapshot, type MatchScore, type MatchSnapshot } from "../scoring/scoring";
 import { Controls, type ControlState } from "../input/controls";
 import { loadFieldModels } from "../render/fieldModels";
+import { loadRobotModels } from "../render/robotModels";
 import { Stage, QUALITY_SETTINGS, CAMERA_LABELS, type Quality } from "../render/stage";
 import { RAPIER, createWorld, initPhysics, yawOf, type PhysicsWorld } from "../sim/physics";
 import { buildField, ALLIANCE_COLORS } from "../sim/field";
@@ -244,7 +245,9 @@ export class Game {
       const stored = await getRobot(options.robotModelId).catch(() => undefined);
       if (stored) cad = { model: await loadStoredModel(stored.glb), sizeIn: stored.sizeIn };
     }
-    return new Game(container, options, callbacks, cad);
+    // CADs oficiais dos starter bots (médio e alto), para o robô do jogador e para os bots
+    const presetModel = await loadRobotModels(options.quality === "low" ? [] : [options.robotPreset, ...BOT_PRESETS]);
+    return new Game(container, options, callbacks, cad, presetModel);
   }
 
   private constructor(
@@ -252,6 +255,7 @@ export class Game {
     readonly options: GameOptions,
     private readonly callbacks: GameCallbacks,
     cad?: CadRobot,
+    private readonly presetModel: (id: BotPresetId) => THREE.Object3D | undefined = () => undefined,
   ) {
     const quality = QUALITY_SETTINGS[options.quality];
     this.stage = new Stage(container, options.quality, "red");
@@ -279,7 +283,7 @@ export class Game {
       { ...robotConfigFromPreset(withCadSize(robotPreset(options.robotPreset), cad)), alliance: "red", teamNumber: options.teamNumber, start: RED_START, launchIntervalS: options.launchIntervalS },
       this.physics,
       this.stage.scene,
-      cad?.model,
+      cad?.model ?? this.presetModel(options.robotPreset),
     );
     this.robot.onLaunch = () => this.sound.launch(this.pan(this.robot.group.position.x));
     this.createBots(options.bots);
@@ -483,13 +487,15 @@ export class Game {
     if (options.partner || options.partnerPlayer) wanted.push(["red", 1]);
     for (let i = 0; i < options.opponents; i++) wanted.push(["blue", i as 0 | 1]);
     wanted.forEach(([alliance, slot], i) => {
-      const preset = ROBOT_PRESETS[BOT_PRESETS[i % BOT_PRESETS.length]];
+      const presetId = BOT_PRESETS[i % BOT_PRESETS.length];
+      const preset = ROBOT_PRESETS[presetId];
       const human = !!options.partnerPlayer && alliance === "red";
       const label = human ? "JOGADOR 2" : `BOT ${i + 1}`;
       const robot = new Robot(
         { ...robotConfigFromPreset(preset), alliance, teamNumber: label, start: BOT_STARTS[alliance][slot] },
         this.physics,
         this.stage.scene,
+        this.presetModel(presetId),
       );
       robot.onLaunch = () => this.sound.launch(this.pan(robot.group.position.x));
       this.bots.push({ robot, brain: new BotBrain(alliance, options.level), alliance, slot, label, human });
