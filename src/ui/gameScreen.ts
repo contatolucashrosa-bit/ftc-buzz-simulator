@@ -9,6 +9,9 @@ import type { AllianceScore } from "../scoring/scoring";
 import { previousBest, rankTeams, recordFromScore, saveRecord } from "../match/history";
 import { REPLAY_SECONDS } from "../game/replay";
 
+/** Tempo total de pausa por aliança numa partida com dois jogadores. */
+const PAUSE_BUDGET_S = 30;
+
 export type OverlayMode = "broadcast" | "driver" | "hidden";
 export type OverlayScale = 0.5 | 0.75 | 1;
 
@@ -267,25 +270,76 @@ export async function mountGameScreen(root: HTMLElement, options: GameOptions, a
   };
   const closeModal = () => (modal.innerHTML = "");
 
+  // Pausa: livre no jogo solo. Com dois jogadores, cada aliança tem 30 s de pausa para a partida inteira
+  // (pode pausar várias vezes; o tempo corre enquanto o menu está aberto e a partida volta sozinha no fim).
+  const timedPause = options.mode === "match" && !!options.bots?.partnerPlayer;
+  const pauseLeft = { red: PAUSE_BUDGET_S, blue: PAUSE_BUDGET_S };
+  let pauseClock = 0;
+  let latest: GameView | null = null;
+  let matchOver = false;
+  const pauseButton = q<HTMLButtonElement>('[data-act="pause"]');
+  const showPauseBudget = () => {
+    if (!timedPause) return;
+    const left = Math.ceil(pauseLeft.red);
+    pauseButton.textContent = left > 0 ? `Pausar (Esc) · ${left} s` : "Pausas esgotadas";
+    pauseButton.disabled = left <= 0;
+  };
+  const stopPauseClock = () => {
+    clearInterval(pauseClock);
+    pauseClock = 0;
+  };
+  const resume = () => {
+    stopPauseClock();
+    closeModal();
+    game?.setPaused(false);
+    showPauseBudget();
+  };
+
   const pauseMenu = () => {
     if (!game) return;
+    // o limite só vale com a partida em andamento
+    const limited = timedPause && !!latest?.started && !matchOver;
+    if (limited && pauseLeft.red <= 0) return;
     game.setPaused(true);
+    const score = latest?.score;
     showModal(
-      `<h2>Pausado</h2><p>A física e o relógio estão parados.</p>
-       <div class="actions">
-         <button class="btn btn-primary" data-m="resume">Continuar</button>
-         <button class="btn btn-secondary" data-m="replay">Replay (últimos ${REPLAY_SECONDS} s)</button>
-         <button class="btn btn-secondary" data-m="restart">Reiniciar</button>
-         <button class="btn btn-secondary" data-m="exit">Sair para o início</button>
+      `<div class="pause-menu">
+         <span class="pause-tag">${escapeHtml(options.matchLabel)}</span>
+         <h2>Partida pausada</h2>
+         ${score ? `<div class="pause-score"><span class="red">${score.red.total}</span><span class="clock">${escapeHtml(latest!.clockText)}</span><span class="blue">${score.blue.total}</span></div>` : ""}
+         ${limited ? `<div class="pause-budget" role="timer" aria-live="off"><div class="pause-budget-bar"><i data-budget-bar></i></div><p>Pausa da aliança: <strong data-budget></strong> de ${PAUSE_BUDGET_S} s. A partida volta sozinha quando o tempo acabar.</p></div>` : `<p class="pause-note">A física e o relógio estão parados.</p>`}
+         <div class="pause-actions">
+           <button class="btn btn-primary" data-m="resume">Continuar</button>
+           ${limited ? "" : `<button class="btn btn-secondary" data-m="replay">Replay (últimos ${REPLAY_SECONDS} s)</button>`}
+           <button class="btn btn-secondary" data-m="help">Controles</button>
+           <button class="btn btn-secondary" data-m="restart">Reiniciar</button>
+           <button class="btn btn-secondary" data-m="exit">Sair para o início</button>
+         </div>
        </div>`,
       (el) => {
-        el.querySelector('[data-m="replay"]')!.addEventListener("click", () => openReplay(pauseMenu));
-        el.querySelector('[data-m="resume"]')!.addEventListener("click", () => {
-          closeModal();
-          game?.setPaused(false);
+        el.querySelector('[data-m="replay"]')?.addEventListener("click", () => openReplay(pauseMenu));
+        el.querySelector('[data-m="resume"]')!.addEventListener("click", resume);
+        el.querySelector('[data-m="help"]')!.addEventListener("click", () => {
+          const help = q("[data-help]");
+          help.hidden = !help.hidden;
         });
         el.querySelector('[data-m="restart"]')!.addEventListener("click", () => actions.restart(options));
         el.querySelector('[data-m="exit"]')!.addEventListener("click", () => actions.exitToHome());
+        if (!limited) return;
+        const label = el.querySelector<HTMLElement>("[data-budget]")!;
+        const bar = el.querySelector<HTMLElement>("[data-budget-bar]")!;
+        let last = performance.now();
+        const tick = () => {
+          const now = performance.now();
+          pauseLeft.red = Math.max(0, pauseLeft.red - (now - last) / 1000);
+          last = now;
+          label.textContent = `${pauseLeft.red.toFixed(1).replace(".", ",")} s`;
+          bar.style.width = `${(pauseLeft.red / PAUSE_BUDGET_S) * 100}%`;
+          if (pauseLeft.red <= 0) resume();
+        };
+        tick();
+        stopPauseClock();
+        pauseClock = window.setInterval(tick, 100);
       },
     );
   };
@@ -309,6 +363,7 @@ export async function mountGameScreen(root: HTMLElement, options: GameOptions, a
   };
 
   const onFinished = (view: GameView) => {
+    matchOver = true;
     recordMatchPlayed();
     // a equipe do jogador é a aliança vermelha (treino solo)
     const record = recordFromScore(view.score.red, { team: options.teamNumber, eventName: options.eventName, robot: robot.label, autoProgram: options.autoProgram });
@@ -428,6 +483,7 @@ export async function mountGameScreen(root: HTMLElement, options: GameOptions, a
   const counters = { red: new ScoreCounter(q('[data-score="red"]')), blue: new ScoreCounter(q('[data-score="blue"]')) };
   const rpState = { red: "", blue: "" };
   const onView = (view: GameView) => {
+    latest = view;
     const { red, blue } = view.score;
     for (const alliance of ["red", "blue"] as const) {
       const spans = q(`[data-teams="${alliance}"]`).children;
@@ -530,9 +586,11 @@ export async function mountGameScreen(root: HTMLElement, options: GameOptions, a
   };
   window.addEventListener("keydown", onKey);
 
+  showPauseBudget();
   if (options.mode === "match") startPrompt();
 
   return () => {
+    stopPauseClock();
     counters.red.dispose();
     counters.blue.dispose();
     window.removeEventListener("keydown", onKey);

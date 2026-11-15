@@ -367,3 +367,49 @@ h1, h2, h3 { line-height: 1.2; margin: 0 0 0.5em; }
   .home-hero, .season { grid-template-columns: 1fr; }
   .feature-strip { grid-template-columns: repeat(2, minmax(0, 1fr)); }
 }
+
+/* ---------- Visual de competição (15/11): títulos em itálico pesado, faixas nas cores das alianças, botões inclinados ---------- */
+.topnav { position: relative; border-bottom: 0; background: linear-gradient(180deg, #05070a, #0d1016); }
+.topnav::after { content: ""; position: absolute; left: 0; right: 0; bottom: 0; height: 4px; background: linear-gradient(90deg, var(--first-red) 0 33.3%, var(--ftc-orange) 33.3% 66.6%, var(--first-blue) 66.6%); }
+.brand { font-weight: 900; font-style: italic; text-transform: uppercase; letter-spacing: 0.02em; }
+.topnav nav button { text-transform: uppercase; font-size: 0.8rem; font-weight: 700; letter-spacing: 0.05em; border-radius: 4px; }
+.topnav nav button[aria-current="page"] { background: var(--ftc-orange); color: #111; }
+h1, h2, .section-title { font-style: italic; font-weight: 900; text-transform: uppercase; letter-spacing: 0.01em; }
+.section-title { border-left: 6px solid var(--ftc-orange); padding-left: 12px; }
+.btn { border-radius: 6px; text-transform: uppercase; letter-spacing: 0.04em; font-size: 0.92rem; transform: skewX(-8deg); transition: transform 0.12s ease, box-shadow 0.12s ease, background 0.12s ease; }
+.btn:hover { transform: skewX(-8deg) translateY(-2px); box-shadow: 0 6px 16px rgba(0, 0, 0, 0.45); }
+.btn-primary { background: var(--ftc-orange); color: #111; }
+.btn-primary:hover { background: #ff9440; }
+.btn-secondary { background: rgba(255, 255, 255, 0.04); border-color: #48505f; }
+.btn-secondary:hover { border-color: var(--ftc-orange); }
+.badge { border-radius: 4px; text-transform: uppercase; letter-spacing: 0.05em; font-weight: 700; }
+
+/* HUD da partida */
+.panel { background: linear-gradient(180deg, rgba(10, 12, 16, 0.92), rgba(16, 19, 25, 0.86)); border-radius: 6px; border: 1px solid #2c323f; border-top: 3px solid var(--ftc-orange); box-shadow: 0 8px 22px rgba(0, 0, 0, 0.35); }
+.panel h4 { font-style: italic; font-weight: 900; color: #fff; }
+.icon-btn { border-radius: 4px; text-transform: uppercase; font-size: 0.74rem; font-weight: 700; letter-spacing: 0.05em; border-left: 3px solid var(--ftc-orange); background: rgba(10, 12, 16, 0.9); text-align: left; }
+.icon-btn:hover:not(:disabled) { background: var(--ftc-orange); color: #111; }
+.icon-btn:disabled { opacity: 0.5; cursor: default; }
+.ov-main { box-shadow: 0 6px 18px rgba(0, 0, 0, 0.45); }
+.ov-center { border-bottom: 4px solid var(--ftc-orange); }
+.ov-score, .ov-timer { font-style: italic; }
+.toast { border-left: 4px solid var(--ftc-orange); }
+
+/* Janelas e menu de pausa */
+.modal-backdrop { background: radial-gradient(circle at 50% 40%, rgba(8, 10, 14, 0.55), rgba(0, 0, 0, 0.82)); backdrop-filter: blur(3px); }
+.modal { border-radius: 8px; border: 1px solid #2c323f; border-top: 5px solid var(--ftc-orange); background: linear-gradient(180deg, #171a21, #101318); box-shadow: 0 24px 60px rgba(0, 0, 0, 0.6); }
+.pause-menu { text-align: center; }
+.pause-menu h2 { font-size: 2rem; margin: 6px 0 12px; }
+.pause-tag { display: inline-block; background: var(--ftc-orange); color: #111; font-weight: 900; font-size: 0.75rem; text-transform: uppercase; letter-spacing: 0.08em; padding: 2px 10px; transform: skewX(-8deg); }
+.pause-score { display: grid; grid-template-columns: 1fr auto 1fr; margin: 0 auto 14px; max-width: 360px; font-weight: 900; font-style: italic; font-size: 1.8rem; font-variant-numeric: tabular-nums; }
+.pause-score .red { background: var(--first-red); padding: 4px 0; }
+.pause-score .blue { background: var(--first-blue); padding: 4px 0; }
+.pause-score .clock { background: #fff; color: #111; padding: 4px 18px; }
+.pause-note { color: var(--text-muted); margin: 0 0 6px; }
+.pause-budget { margin: 0 auto 6px; max-width: 420px; }
+.pause-budget p { color: var(--text-muted); font-size: 0.88rem; margin: 6px 0 0; }
+.pause-budget-bar { height: 10px; background: #2a2f3a; border-radius: 2px; overflow: hidden; transform: skewX(-8deg); }
+.pause-budget-bar i { display: block; height: 100%; width: 100%; background: linear-gradient(90deg, var(--first-red), var(--ftc-orange)); transition: width 0.1s linear; }
+.pause-actions { display: grid; gap: 10px; max-width: 340px; margin: 18px auto 0; }
+.pause-actions .btn { width: 100%; }
+@media (prefers-reduced-motion: reduce) { .btn, .btn:hover { transition: none; transform: skewX(-8deg); } }
