@@ -102,3 +102,7 @@
   - o robô inclina ao acelerar e frear e dá um coice curto a cada lançamento;
   - a HIVE balança no amortecedor por cerca de 1 s depois do TIP;
   - a aliança comemora o TIP da própria HIVE (braços para cima e pulinhos; o piloto levanta um braço só).
+- **Sons de partida do FTC Live (15/11/2026):** os avisos da partida usam os sons do sistema de placar oficial quando eles estão neste aparelho: início (`charge`), fim do AUTO (`endauto`), "peguem os controles" (`controllers`), contagem 3-2-1, início do TELEOP (`firebell`), FLOWERS liberadas (`windchimes`), 30 s finais (`whistle`), fim (`endmatch`) e resultado (`results`).
+  - Os arquivos são da *FIRST* e **não vão para o repositório**: `npm run sounds:ftclive` copia da instalação local do FTC Live (precisa estar aberto; usuário padrão `local`) para `public/sounds/ftclive/`.
+  - Sem os arquivos, valem as buzinas sintetizadas; os avisos de voz ficam em silêncio.
+  - Suposição: o `windchimes` toca quando as FLOWERS são liberadas e o `whistle` nos 30 s finais; no FTC Live eles se chamam aviso de meio de partida e aviso de fim de partida, e o instante exato não foi conferido numa partida oficial.

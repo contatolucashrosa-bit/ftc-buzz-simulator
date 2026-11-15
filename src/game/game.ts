@@ -15,7 +15,7 @@ import { Hive } from "../sim/hive";
 import { Flower } from "../sim/flower";
 import { Robot, robotConfigFromPreset } from "../sim/robot";
 import { Environment } from "../render/environment";
-import { SoundBoard } from "../render/audio";
+import { type MatchCue, SoundBoard } from "../render/audio";
 import { ReplayPlayer, ReplayRecorder } from "./replay";
 import { FoulMonitor, type FoulRobot } from "./fouls";
 import { detectTags, hiveTags, type CameraIntrinsics, type CameraMount } from "../sim/vision";
@@ -232,6 +232,7 @@ export class Game {
   readonly sound = new SoundBoard();
   private lastPhase: ClockState["phase"] | null = null;
   private lastFlowerUnlocked = false;
+  private readonly cuesPlayed = new Set<MatchCue>();
   // Código Java: um HardwareBus por OpMode em execução
   private javaBus: HardwareBus | null = null;
   private javaRole: "auto" | "teleop" | null = null;
@@ -782,15 +783,31 @@ export class Game {
     return (worldX - this.stage.camera.position.x) / 2.5;
   }
 
-  /** Buzinas nas mudanças de fase da partida. */
+  /** Avisos sonoros da partida, na mesma sequência dos eventos. */
   private phaseSounds(clock: ClockState): void {
     if (this.options.mode !== "match") return;
     if (this.lastPhase !== null && clock.phase !== this.lastPhase) {
-      if (clock.phase === "auto") this.sound.buzzer("start");
-      else if (clock.phase === "transition" || clock.phase === "post") this.sound.buzzer("end");
-      else if (clock.phase === "teleop") this.sound.buzzer("teleop");
+      this.cuesPlayed.clear();
+      if (clock.phase === "auto") this.sound.cue("matchStart");
+      else if (clock.phase === "transition") {
+        this.sound.cue("autoEnd");
+        // "peguem os controles" logo depois da buzina do fim do AUTO
+        this.sound.cue("controllers", 2.2);
+      } else if (clock.phase === "teleop") this.sound.cue("teleopStart");
+      else if (clock.phase === "post") {
+        this.sound.cue("matchEnd");
+        this.sound.cue("results", 3.5);
+      }
     }
-    if (clock.flowerUnlocked && !this.lastFlowerUnlocked && this.started) this.sound.buzzer("endgame");
+    const once = (cue: MatchCue, when: boolean) => {
+      if (!when || this.cuesPlayed.has(cue)) return;
+      this.cuesPlayed.add(cue);
+      this.sound.cue(cue);
+    };
+    // contagem 3-2-1 nos últimos segundos da transição; avisos no TELEOP: FLOWERS liberadas e 30 s finais
+    once("countdown", clock.phase === "transition" && clock.displaySeconds <= 3.05);
+    once("midMatch", clock.phase === "teleop" && clock.flowerUnlocked && !this.lastFlowerUnlocked && this.started);
+    once("endgameWarning", clock.phase === "teleop" && clock.matchSecondsRemaining <= 30);
     this.lastPhase = clock.phase;
     this.lastFlowerUnlocked = clock.flowerUnlocked;
   }

@@ -1,16 +1,35 @@
 // Buzz Simulator — Criado por Lucas Hochmann Rosa (https://github.com/contatolucashrosa-bit), em parceria com WestSharksFTC #24823.
-// Sons do jogo, todos sintetizados com a Web Audio API (nenhum arquivo de áudio, nada do vídeo oficial):
-// batidas das bolas, lançamento, TIP da HIVE com torcida, pontos e as buzinas da partida.
+// Sons do jogo, sintetizados com a Web Audio API: batidas das bolas, lançamento, TIP da HIVE com torcida,
+// pontos e as buzinas da partida. Os avisos de partida usam os sons do FTC Live quando estão neste aparelho.
 
 const PREFS_KEY = "buzz-simulator:sound";
 const MAX_IMPACTS_PER_SECOND = 14;
 
 export type Buzzer = "start" | "teleop" | "endgame" | "end";
 
+/** Momentos da partida que têm som próprio nos eventos (os mesmos avisos do sistema de placar oficial). */
+export type MatchCue = "matchStart" | "autoEnd" | "controllers" | "countdown" | "teleopStart" | "midMatch" | "endgameWarning" | "matchEnd" | "results";
+
+// Sons de partida do FTC Live, copiados da instalação local por scripts/ftclive-sounds.mjs (ficam fora do git).
+// Sem os arquivos, cada momento cai na buzina sintetizada correspondente (ou em silêncio, nos avisos de voz).
+const CUE_FILES: Record<MatchCue, string> = {
+  matchStart: "charge",
+  autoEnd: "endauto",
+  controllers: "controllers",
+  countdown: "3-2-1",
+  teleopStart: "firebell",
+  midMatch: "windchimes",
+  endgameWarning: "whistle",
+  matchEnd: "endmatch",
+  results: "results",
+};
+const CUE_FALLBACK: Partial<Record<MatchCue, Buzzer>> = { matchStart: "start", autoEnd: "end", teleopStart: "teleop", midMatch: "endgame", endgameWarning: "endgame", matchEnd: "end" };
+
 export class SoundBoard {
   private ctx: AudioContext | null = null;
   private master: GainNode | null = null;
   private noise: AudioBuffer | null = null;
+  private readonly samples = new Map<MatchCue, AudioBuffer>();
   private impactBudget = MAX_IMPACTS_PER_SECOND;
   private lastBudgetAt = 0;
   muted: boolean;
@@ -55,6 +74,7 @@ export class SoundBoard {
       this.master = this.ctx.createGain();
       this.master.gain.value = this.muted ? 0 : 0.7;
       this.master.connect(this.ctx.destination);
+      this.loadSamples(this.ctx);
       // 1 s de ruído branco, reaproveitado por todos os sons de impacto e torcida
       const buffer = this.ctx.createBuffer(1, this.ctx.sampleRate, this.ctx.sampleRate);
       const data = buffer.getChannelData(0);
@@ -63,6 +83,38 @@ export class SoundBoard {
     }
     if (this.ctx.state === "suspended") void this.ctx.resume();
     return this.ctx;
+  }
+
+  /** Carrega os sons de partida, se existirem neste aparelho. */
+  private loadSamples(ctx: AudioContext): void {
+    for (const [cue, file] of Object.entries(CUE_FILES) as Array<[MatchCue, string]>) {
+      fetch(`${import.meta.env.BASE_URL}sounds/ftclive/${file}.flac`)
+        .then((r) => (r.ok ? r.arrayBuffer() : null))
+        .then((data) => {
+          // "fLaC" no início: sem o arquivo, o servidor pode devolver a página do app no lugar
+          if (!data || new TextDecoder().decode(data.slice(0, 4)) !== "fLaC") return;
+          return ctx.decodeAudioData(data).then((buffer) => void this.samples.set(cue, buffer));
+        })
+        .catch(() => {
+          // sem o arquivo ou sem suporte a FLAC: fica a buzina sintetizada
+        });
+    }
+  }
+
+  /** Som de um momento da partida; `delay` em segundos. */
+  cue(kind: MatchCue, delay = 0): void {
+    const ctx = this.ready();
+    if (!ctx) return;
+    const sample = this.samples.get(kind);
+    if (sample) {
+      const source = ctx.createBufferSource();
+      source.buffer = sample;
+      source.connect(this.master!);
+      source.start(ctx.currentTime + delay);
+      return;
+    }
+    const fallback = CUE_FALLBACK[kind];
+    if (fallback && delay === 0) this.buzzer(fallback);
   }
 
   private ready(): AudioContext | null {

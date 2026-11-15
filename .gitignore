@@ -16,3 +16,5 @@ am-58*.pdf
 public/models/field/
 # Starter bots a partir dos CADs dos fabricantes (scripts/blender/build_robots.py)
 public/models/robots/
+# Sons de partida copiados do FTC Live local (scripts/ftclive-sounds.mjs): material da FIRST, não redistribuído
+public/sounds/ftclive/

@@ -17,6 +17,7 @@
     "cad:convert": "node --max-old-space-size=12288 scripts/step-to-glb.mjs",
     "field:parts": "node scripts/arena-parts.mjs cad/arena cad/arena-parts",
     "field:models": "blender -b --python scripts/blender/build_field.py -- cad/arena-parts public/models/field",
+    "sounds:ftclive": "node scripts/ftclive-sounds.mjs",
     "robots:models": "blender -b --python scripts/blender/build_robots.py -- cad/robots public/models/robots"
   },
   "dependencies": {
