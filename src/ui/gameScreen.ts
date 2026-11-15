@@ -2,7 +2,7 @@
 // Tela de jogo: canvas 3D + Score Overlay + HUD + pausa + resultado.
 import { Game, type GameOptions, type GameView } from "../game/game";
 import { recordMatchPlayed } from "../config/app";
-import { ICON_POLLINATOR, ICON_ROBOT, ICON_SWARM } from "./icons";
+import { ICON_CELL, ICON_NECTAR, ICON_POLLINATOR, ICON_SWARM } from "./icons";
 import { escapeHtml } from "./dom";
 import { robotPreset } from "../config/robotPresets";
 import type { AllianceScore } from "../scoring/scoring";
@@ -165,11 +165,15 @@ export async function mountGameScreen(root: HTMLElement, options: GameOptions, a
     <div class="game" role="application" aria-label="Arena do Buzz Simulator">
       <div class="stage-host"></div>
       <div class="overlay" aria-live="off" data-overlay>
-        <div class="ov-top"><span class="ov-event"></span><span class="ov-match"></span><span></span></div>
+        <div class="ov-top"><span class="ov-brand">Buzz Simulator</span><span class="ov-event"></span><span class="ov-match"></span><span class="ov-season">BIOBUZZ</span></div>
         <div class="ov-main">
-          <div class="ov-alliance blue"><div class="ov-bonus" data-bonus="blue"></div><div class="ov-teams" data-teams="blue"><span>—</span><span>—</span></div><div class="ov-score" data-score="blue">0</div></div>
-          <div class="ov-center">${ICON_ROBOT}<div class="ov-timer-wrap"><div class="ov-timer">2:30</div><div class="ov-phase"></div></div></div>
-          <div class="ov-alliance red"><div class="ov-bonus" data-bonus="red"></div><div class="ov-teams" data-teams="red"><span data-team></span><span>—</span></div><div class="ov-score" data-score="red">0</div></div>
+          <div class="ov-stats red"><div class="ov-stat" data-stats="red"></div><div class="ov-bonus" data-bonus="red"></div></div>
+          <div class="ov-teams red" data-teams="red"><span data-team></span><span>—</span></div>
+          <div class="ov-alliance red"><span class="ov-name">Vermelha</span><div class="ov-score" data-score="red">0</div></div>
+          <div class="ov-center"><div class="ov-timer-wrap"><div class="ov-timer">2:30</div><div class="ov-phase"></div></div></div>
+          <div class="ov-alliance blue"><span class="ov-name">Azul</span><div class="ov-score" data-score="blue">0</div></div>
+          <div class="ov-teams blue" data-teams="blue"><span>—</span><span>—</span></div>
+          <div class="ov-stats blue"><div class="ov-bonus" data-bonus="blue"></div><div class="ov-stat" data-stats="blue"></div></div>
         </div>
       </div>
       <div class="toast-area" aria-live="polite"></div>
@@ -436,6 +440,8 @@ export async function mountGameScreen(root: HTMLElement, options: GameOptions, a
   const applyOverlay = () => {
     overlayEl.dataset.mode = hud.mode;
     overlayEl.style.setProperty("--ov-scale", String(hud.scale));
+    // os avisos sobem para não ficar atrás do placar, que fica no rodapé no modo transmissão
+    root.querySelector<HTMLElement>(".game")!.style.setProperty("--toast-bottom", hud.mode === "broadcast" ? `${Math.round(112 * hud.scale + 12)}px` : "20px");
     settingsEl.querySelectorAll<HTMLInputElement>('input[name="ov-mode"]').forEach((r) => (r.checked = r.value === hud.mode));
     settingsEl.querySelectorAll<HTMLButtonElement>("[data-scale]").forEach((b) => b.setAttribute("aria-pressed", String(Number(b.dataset.scale) === hud.scale)));
     saveHudPrefs(hud);
@@ -482,6 +488,7 @@ export async function mountGameScreen(root: HTMLElement, options: GameOptions, a
   };
   const counters = { red: new ScoreCounter(q('[data-score="red"]')), blue: new ScoreCounter(q('[data-score="blue"]')) };
   const rpState = { red: "", blue: "" };
+  const detailState = { red: "", blue: "" };
   const onView = (view: GameView) => {
     latest = view;
     const { red, blue } = view.score;
@@ -506,6 +513,13 @@ export async function mountGameScreen(root: HTMLElement, options: GameOptions, a
         });
       }
       rpState[alliance] = key;
+      // contadores do placar de transmissão: TIPs rumo ao próximo RP (4, depois 7) e NECTAR ainda fora do campo
+      const goal = score.pollinator1.achieved ? score.pollinator2.threshold : score.pollinator1.threshold;
+      const stats = `<span class="ov-count" title="TIPs da HIVE">${ICON_CELL}<b>${score.hiveTips}</b><i>/${goal}</i></span><span class="ov-count nectar" title="NECTAR fora do campo">${ICON_NECTAR}<b>${view.nectarOffField[alliance]}</b></span>`;
+      if (detailState[alliance] !== stats) {
+        detailState[alliance] = stats;
+        q(`[data-stats="${alliance}"]`).innerHTML = stats;
+      }
     }
     replayBar.hidden = !view.replay;
     if (view.replay) {

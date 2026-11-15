@@ -11,3 +11,9 @@ export const ICON_SWARM = `<svg viewBox="0 0 24 24" aria-hidden="true"><path d="
 /** POLLINATOR: HIVE virando. */
 export const ICON_POLLINATOR = (n: number) =>
   `<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 15 12 9l9 6" fill="none" stroke="currentColor" stroke-width="2.2"/><rect x="2" y="13" width="6" height="6" rx="1" fill="currentColor"/><rect x="16" y="5" width="6" height="6" rx="1" fill="currentColor" transform="rotate(-25 19 8)"/><text x="12" y="23" font-size="8" text-anchor="middle" font-weight="700" fill="currentColor">${n}</text></svg>`;
+
+/** CELL da HIVE vista de frente (contador de TIPs no placar). */
+export const ICON_CELL = `<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 11 12 5l9 6v8H3z" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linejoin="round"/></svg>`;
+
+/** NECTAR: bola perfurada (contador do que ainda está com o HUMAN PLAYER). */
+export const ICON_NECTAR = `<svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="8.5" fill="none" stroke="currentColor" stroke-width="2.2"/><circle cx="9" cy="9.5" r="1.5" fill="currentColor"/><circle cx="15" cy="9.5" r="1.5" fill="currentColor"/><circle cx="12" cy="14.5" r="1.5" fill="currentColor"/></svg>`;

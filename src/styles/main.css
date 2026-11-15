@@ -413,3 +413,49 @@ h1, h2, .section-title { font-style: italic; font-weight: 900; text-transform: u
 .pause-actions { display: grid; gap: 10px; max-width: 340px; margin: 18px auto 0; }
 .pause-actions .btn { width: 100%; }
 @media (prefers-reduced-motion: reduce) { .btn, .btn:hover { transition: none; transform: skewX(-8deg); } }
+
+/* ---------- Placar de transmissão (15/11): mesma organização da tela da audiência usada nos eventos de FIRST Tech
+   Challenge (barra no rodapé; vermelha à esquerda; contadores, equipes, placar e cronômetro no centro), refeita
+   aqui com desenhos próprios: sem logotipos, arte ou sons oficiais. ---------- */
+.overlay[data-mode="broadcast"] { top: auto; bottom: 0; transform-origin: bottom center; width: min(1180px, 100%); }
+.toast-area { bottom: var(--toast-bottom, 20px); }
+.ov-top { grid-template-columns: auto 1fr 1fr auto; gap: 14px; background: #000; padding: 0; font-size: 0.9rem; font-weight: 700; text-align: center; }
+.ov-top .ov-brand, .ov-top .ov-season { background: #fff; color: #000; font-weight: 900; font-style: italic; text-transform: uppercase; padding: 3px 12px; letter-spacing: 0.02em; }
+.ov-top .ov-match { letter-spacing: 0; }
+.ov-main { grid-template-columns: 1fr auto 112px 150px 112px auto 1fr; height: 76px; box-shadow: 0 -6px 18px rgba(0, 0, 0, 0.4); }
+.ov-stats { display: flex; align-items: center; justify-content: center; gap: 14px; padding: 0 12px; color: #fff; }
+.ov-stats.red { background: #7d0f14; border-top: 5px solid var(--first-red); }
+.ov-stats.blue { background: #003a6b; border-top: 5px solid var(--first-blue); }
+.ov-stat { display: flex; align-items: center; gap: 14px; }
+.ov-count { display: inline-flex; align-items: center; gap: 4px; font-weight: 900; font-size: 1.15rem; font-variant-numeric: tabular-nums; }
+.ov-count svg { width: 26px; height: 26px; }
+.ov-count b { background: #fff; color: #111; padding: 0 7px; min-width: 26px; text-align: center; }
+.ov-count i { font-style: normal; }
+.ov-stats.red .ov-count { background: var(--first-red); padding: 2px 6px; }
+.ov-stats.blue .ov-count { background: var(--first-blue); padding: 2px 6px; }
+.ov-count.nectar { flex-direction: column; gap: 0; font-size: 0.95rem; }
+.ov-count.nectar b { background: none; color: #fff; padding: 0; }
+.ov-count.nectar svg { width: 22px; height: 22px; }
+.ov-stats .ov-icon { width: 28px; height: 28px; }
+.ov-stats .ov-icon svg { width: 18px; height: 18px; }
+.ov-teams { justify-content: center; gap: 2px; background: #111; padding: 2px; }
+.ov-teams span { display: grid; place-items: center; flex: 1; background: #fff; color: #111; font-size: 1.05rem; font-weight: 900; min-width: 84px; border-radius: 0; padding: 0 8px; }
+.ov-alliance { flex-direction: column; justify-content: center; gap: 0; padding: 0; }
+.ov-alliance.red { background: var(--first-red); flex-direction: column; }
+.ov-alliance.blue { background: var(--first-blue); flex-direction: column; }
+.ov-name { font-size: 0.78rem; font-weight: 700; line-height: 1; margin-top: 4px; }
+.ov-score, .ov-alliance.red .ov-score, .ov-alliance.blue .ov-score { margin: 0; font-size: 2.5rem; line-height: 1.05; min-width: 0; font-style: normal; }
+.ov-alliance .ov-gain { top: -18px; left: 50%; right: auto; transform: translateX(-50%); }
+.ov-center { min-width: 0; padding: 0; border: 0; }
+.ov-timer { font-size: 2.7rem; font-style: normal; letter-spacing: -0.02em; }
+.ov-phase { font-size: 0.66rem; }
+/* modo piloto: só placar e cronômetro, no topo */
+.overlay[data-mode="driver"] .ov-stats, .overlay[data-mode="driver"] .ov-name { display: none; }
+.overlay[data-mode="driver"] .ov-main { grid-template-columns: 1fr 150px 1fr; }
+.overlay[data-mode="driver"] .ov-score { font-size: 1.7rem; }
+@media (max-width: 760px) { .ov-stats .ov-bonus { display: none; } .ov-teams span { min-width: 56px; font-size: 0.85rem; } .ov-main { grid-template-columns: 1fr auto 84px 110px 84px auto 1fr; } }
+/* com o placar no rodapé, os painéis, os avisos e a barra de replay sobem a altura dele */
+.hud, .help { bottom: calc(var(--toast-bottom, 20px) - 8px); }
+.replay-bar { bottom: var(--toast-bottom, 16px); }
+.help { max-height: calc(100% - var(--toast-bottom, 20px) - 110px); overflow: auto; }
+.ov-teams span { white-space: nowrap; }

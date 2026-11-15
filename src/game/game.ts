@@ -141,6 +141,8 @@ export interface GameView {
   bursting: boolean;
   nectarAvailable: number;
   nectarInArea: number;
+  /** NECTAR de cada aliança que ainda está fora do campo (com o HUMAN PLAYER). */
+  nectarOffField: Record<Alliance, number>;
   cameraLabel: string;
   relativeDrive: boolean;
   fouls: FoulEntry[];
@@ -1133,6 +1135,7 @@ export class Game {
       bursting: this.robot.bursting,
       nectarAvailable: this.nectarAvailable("red", clock),
       nectarInArea: this.pools.red.staged + this.pools.red.returned,
+      nectarOffField: { red: this.pools.red.staged + this.pools.red.returned, blue: this.pools.blue.staged + this.pools.blue.returned },
       cameraLabel: CAMERA_LABELS[this.stage.mode],
       relativeDrive: this.relativeDrive,
       fouls: [...this.fouls],
