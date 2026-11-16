@@ -10,6 +10,18 @@ import { previousBest, rankTeams, recordFromScore, saveRecord } from "../match/h
 import { REPLAY_SECONDS } from "../game/replay";
 import { playAbortSound } from "../render/audio";
 
+/** Ícones da barra de ferramentas da partida (traço simples, herdam a cor do botão). */
+const svg = (body: string) => `<svg viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">${body}</svg>`;
+const TOOL_ICONS = {
+  pause: svg('<path d="M9 5v14M15 5v14"/>'),
+  camera: svg('<path d="M3 8h4l2-3h6l2 3h4v11H3z"/><circle cx="12" cy="13" r="3.5"/>'),
+  scoreboard: svg('<rect x="3" y="6" width="18" height="12" rx="1"/><path d="M9 6v12M15 6v12"/>'),
+  sound: svg('<path d="M4 9h4l5-4v14l-5-4H4z"/><path d="M17 9a4 4 0 0 1 0 6"/>'),
+  muted: svg('<path d="M4 9h4l5-4v14l-5-4H4z"/><path d="M17 9l4 6M21 9l-4 6"/>'),
+  help: svg('<circle cx="12" cy="12" r="9"/><path d="M9.5 9.5a2.5 2.5 0 1 1 3.5 2.3c-.7.3-1 .8-1 1.5V14"/><path d="M12 17.5h.01"/>'),
+  touch: svg('<rect x="6" y="3" width="12" height="18" rx="2"/><path d="M10 18h4"/>'),
+};
+
 /** Tempo total de pausa por aliança numa partida com dois jogadores. */
 const PAUSE_BUDGET_S = 30;
 
@@ -33,13 +45,14 @@ interface HudPrefs {
 
 function loadHudPrefs(): HudPrefs {
   // Padrão 0,5×: o placar inteiro continua legível e deixa a HIVE livre na visão do piloto.
-  const fallback: HudPrefs = { mode: "broadcast", scale: 0.5, robotPanelCollapsed: false };
+  // Padrões discretos: o painel do robô começa recolhido
+  const fallback: HudPrefs = { mode: "broadcast", scale: 0.75, robotPanelCollapsed: true };
   try {
     const saved = JSON.parse(localStorage.getItem(HUD_KEY) ?? "{}") as Partial<HudPrefs>;
     return {
       mode: OVERLAY_MODES.some((m) => m.id === saved.mode) ? saved.mode! : fallback.mode,
       scale: OVERLAY_SCALES.includes(saved.scale as OverlayScale) ? saved.scale! : fallback.scale,
-      robotPanelCollapsed: saved.robotPanelCollapsed === true,
+      robotPanelCollapsed: saved.robotPanelCollapsed ?? fallback.robotPanelCollapsed,
     };
   } catch {
     return fallback;
@@ -208,9 +221,9 @@ export async function mountGameScreen(root: HTMLElement, options: GameOptions, a
       </div>
       <div class="toast-area" aria-live="polite"></div>
       <div class="game-actions">
-        <button class="icon-btn" data-act="pause">Pausar (Esc)</button>
-        <button class="icon-btn" data-act="camera">Câmera (C)</button>
-        <button class="icon-btn" data-act="overlay" aria-expanded="false">Placar (V)</button>
+        <button class="icon-btn" data-act="pause" title="Pausar (Esc)" aria-label="Pausar (Esc)">${TOOL_ICONS.pause}<span class="tool-badge" data-pause-left hidden></span></button>
+        <button class="icon-btn" data-act="camera" title="Câmera (C)" aria-label="Trocar câmera (C)">${TOOL_ICONS.camera}</button>
+        <button class="icon-btn" data-act="overlay" aria-expanded="false" title="Placar (V)" aria-label="Opções do placar (V)">${TOOL_ICONS.scoreboard}</button>
         <div class="panel overlay-settings" data-overlay-settings hidden>
           <h4>Placar</h4>
           <fieldset class="seg" aria-label="Modo do placar">
@@ -222,9 +235,9 @@ export async function mountGameScreen(root: HTMLElement, options: GameOptions, a
           </div>
           <p class="hint">Na câmera "Seguir robô": arraste para girar, use a roda para aproximar e dê dois cliques para voltar ao padrão. No controle: analógico direito (com R3 para girar).</p>
         </div>
-        <button class="icon-btn" data-act="sound" aria-pressed="false">Som (M)</button>
-        <button class="icon-btn" data-act="help">Ajuda</button>
-        <button class="icon-btn" data-act="touch">Toque</button>
+        <button class="icon-btn" data-act="sound" aria-pressed="false" title="Som (M)" aria-label="Som (M)">${TOOL_ICONS.sound}</button>
+        <button class="icon-btn" data-act="help" aria-expanded="false" title="Controles" aria-label="Mostrar os controles">${TOOL_ICONS.help}</button>
+        <button class="icon-btn touch-only" data-act="touch" title="Controles na tela" aria-label="Controles na tela">${TOOL_ICONS.touch}</button>
       </div>
       <div class="hud">
         <div class="panel robot-panel" data-robot-panel>
@@ -252,8 +265,8 @@ export async function mountGameScreen(root: HTMLElement, options: GameOptions, a
           ${options.java?.teleop ? `<p class="hint">Gamepad 1 no teclado: W A S D (analógico esquerdo), Q/E (direito), setas (direcional), Espaço/F (gatilhos), H/G (bumpers), I J K L (Y X A B).</p>` : ""}
         </div>
       </div>
-      <div class="panel help" data-help ${isTouch ? "hidden" : ""}>
-        <h4>Controles</h4>
+      <div class="panel help" data-help hidden>
+        <h4>Controles <button type="button" class="panel-close" data-help-close aria-label="Fechar os controles">×</button></h4>
         <table>
           <tr><td>W A S D</td><td>${robot.drivetrain === "mecanum" ? "mover" : "W S andar · A D não fazem nada (tração tanque)"}</td></tr>
           <tr><td>Q / E</td><td>girar</td></tr>
@@ -316,7 +329,10 @@ export async function mountGameScreen(root: HTMLElement, options: GameOptions, a
   const showPauseBudget = () => {
     if (!timedPause) return;
     const left = Math.ceil(pauseLeft.red);
-    pauseButton.textContent = left > 0 ? `Pausar (Esc) · ${left} s` : "Pausas esgotadas";
+    const badge = pauseButton.querySelector<HTMLElement>("[data-pause-left]")!;
+    badge.hidden = false;
+    badge.textContent = left > 0 ? `${left}s` : "0";
+    pauseButton.title = left > 0 ? `Pausar (Esc): ${left} s de pausa restantes` : "Pausas esgotadas";
     pauseButton.disabled = left <= 0;
   };
   const stopPauseClock = () => {
@@ -650,15 +666,19 @@ export async function mountGameScreen(root: HTMLElement, options: GameOptions, a
     settingsEl.hidden = !settingsEl.hidden;
     (e.currentTarget as HTMLElement).setAttribute("aria-expanded", String(!settingsEl.hidden));
   });
-  root.querySelector('[data-act="help"]')!.addEventListener("click", () => {
+  const toggleHelp = (show?: boolean) => {
     const help = q("[data-help]");
-    help.hidden = !help.hidden;
-  });
+    help.hidden = show === undefined ? !help.hidden : !show;
+    q('[data-act="help"]').setAttribute("aria-expanded", String(!help.hidden));
+  };
+  root.querySelector('[data-act="help"]')!.addEventListener("click", () => toggleHelp());
+  root.querySelector("[data-help-close]")!.addEventListener("click", () => toggleHelp(false));
   root.querySelector('[data-act="touch"]')!.addEventListener("click", () => q("[data-touch]").classList.toggle("show"));
 
   const soundBtn = q<HTMLButtonElement>('[data-act="sound"]');
   const showSound = (muted: boolean) => {
-    soundBtn.textContent = muted ? "Sem som (M)" : "Som (M)";
+    soundBtn.innerHTML = muted ? TOOL_ICONS.muted : TOOL_ICONS.sound;
+    soundBtn.title = muted ? "Sem som (M)" : "Som (M)";
     soundBtn.setAttribute("aria-pressed", String(muted));
   };
   showSound(game.sound.muted);

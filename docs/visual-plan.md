@@ -127,3 +127,9 @@
   - pinheiros em bosques espaçados entre 20 e 34 m e uma faixa contínua ao fundo (38 a 62 m), que com a neblina fecha o horizonte. No Alto: 280 árvores (antes 750), 70 samambaias (220), 40 arbustos (140), 21 cogumelos (70) e 120 flores (320);
   - texturas novas, geradas no código e sem emenda: grama com folhinhas em vários tons, manchas e pontos de terra (também usada como relevo); agulhas nos pinheiros e casca nos troncos; pinheiros e arbustos com sombreamento suave em vez de facetas;
   - custo no Alto: 5,5 a 6,5 ms por quadro (antes cerca de 7 ms).
+- **Galpão industrial no lugar da floresta (16/11/2026):**
+  - a arena fica dentro de um galpão modelado no Blender (`scripts/blender/build_venue.py`, gerado do zero e versionado em `public/models/venue/`): piso de concreto com juntas, paredes de chapa ondulada (nervuras de verdade), pilares e treliças de aço, cobertura com claraboias, luminárias industriais, arquibancada de 7 fileiras com escadas e guarda-corpos amarelos do lado da plateia, mezanino com escada no fundo, containers, portão de enrolar, paletes e banners das alianças (sem logotipos);
+  - cerca de 17 mil triângulos e 1 MB; o jogo aplica as texturas de concreto e chapa geradas no código;
+  - plateia sentada na arquibancada só no preset Alto: 3 malhas instanciadas (camisa, cabeça e calça) com cores variadas, que balançam e pulam no TIP;
+  - para gerar de novo: `npm run venue:model`.
+- **HUD compacto (16/11/2026):** os botões da partida viraram uma barra de ícones no canto superior direito (pausar, câmera, placar, som, controles); o painel de controles começa escondido e abre por baixo da barra, sem cobrir os botões; o painel do robô começa recolhido; fontes e painéis menores; o placar de transmissão começa em 0,75× e encolhe para caber na tela.
