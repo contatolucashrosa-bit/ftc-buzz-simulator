@@ -30,6 +30,9 @@ const MIN_SIZE_MM = option("min-size", 20);
 const DEFLECTION_MM = option("deflection", 3);
 const ANGULAR = option("angular", 1.2);
 const TRIANGLES = option("triangles", 250000);
+// --parts (sempre por último): uma malha por peça, sem simplificar. É a entrada de scripts/blender/build_robots.py,
+// que refaz o robô peça por peça.
+const PARTS = args.includes("--parts");
 if (!input || !output) {
   console.error("uso: node scripts/step-to-glb.mjs entrada.step saida.glb [--batch 8] [--min-size 20] [--deflection 3] [--angular 1.2] [--triangles 250000]");
   process.exit(1);
@@ -214,8 +217,9 @@ for (let b = 0; b < solids.length; b += BATCH) {
     for (let k = 0; k < 3; k++) { box.min[k] = Math.min(box.min[k], mn[k]); box.max[k] = Math.max(box.max[k], mx[k]); }
     const c = mesh.color ?? [0.6, 0.62, 0.66];
     // agrupa por cor (quantizada): poucas chamadas de desenho no jogo
-    const key = c.map((v) => Math.round(v * 12) / 12).join(",");
-    if (!groups.has(key)) groups.set(key, { color: key.split(",").map(Number), positions: [], normals: [], indices: [] });
+    const tint = c.map((v) => Math.round(v * 12) / 12);
+    const key = PARTS ? `${tint.join(",")}|${kept}` : tint.join(",");
+    if (!groups.has(key)) groups.set(key, { color: tint, positions: [], normals: [], indices: [] });
     const g = groups.get(key);
     const base = g.positions.length / 3;
     for (let i = 0; i < p.length; i++) g.positions.push(p[i]);
@@ -237,7 +241,7 @@ const raw = [...groups.values()].map((g) => ({
   indices: new Uint32Array(g.indices),
 }));
 const before = triangleCount(raw);
-const simplified = await simplifyGroups(raw, TRIANGLES);
+const simplified = PARTS ? raw : await simplifyGroups(raw, TRIANGLES);
 const size = box.min.map((v, k) => box.max[k] - v);
 const out = writeGlb(simplified, { source: input.split(/[\\/]/).pop(), sizeMm: size.map((v) => +v.toFixed(1)) });
 writeFileSync(output, out);

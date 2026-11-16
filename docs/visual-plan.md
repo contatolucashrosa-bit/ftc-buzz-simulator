@@ -111,3 +111,14 @@
   - novo modo do placar, "Cronômetro grande" (tecla V ou botão Placar): relógio enorme no topo, com os dois placares ao lado;
   - na tela de resultado, as linhas entram uma a uma, os totais sobem contando e a aliança vencedora é destacada no fim. Ao voltar do replay, ou com "reduzir movimento" ligado, tudo aparece de uma vez;
   - desenho próprio: as telas equivalentes do FTC Live (modo "field" e resultados) não foram vistas em funcionamento.
+- **Starter bots refeitos peça por peça (16/11/2026):** os modelos anteriores vinham simplificados como um bloco só, e as chapas furadas viravam retalhos; as cores do CAD (cinzas claros) ficavam brancas sob a luz do jogo.
+  - O conversor ganhou `--parts` (uma malha por peça, sem simplificar). O `build_robots.py` refaz cada robô peça por peça: peças "cheias" (perfis, chapas, motores) viram cascos convexos limpos, peças curvas ou abertas mantêm a malha, e peças menores que 0,7 pol (parafusos, porcas) saem.
+  - Cada peça é repintada: pneus pelo formato (encostam no piso, redondos de lado); o resto pela cor do CAD (as peças laranja e vermelhas da REV ficam) ou, sem cor, pelo formato (perfis em alumínio, chapas e motores escuros). Os materiais foram calibrados para a luz do jogo, com metal mais escuro e menos metálico.
+  - Resultado: ~90 mil triângulos e 2,7 a 3,6 MB por robô (antes 110 mil e 5 a 6 MB).
+  - Gerar (fora do git):
+
+    ```bash
+    npm run cad:convert -- "REV DUO - FTC Starter Bot - BIOBUZZ.step" cad/robots/rev-duo-parts.glb --min-size 12 --parts
+    ```
+
+    O mesmo para `andymark-parts.glb` e `gobilda-parts.glb`, depois `npm run robots:models`.
