@@ -122,3 +122,8 @@
     ```
 
     O mesmo para `andymark-parts.glb` e `gobilda-parts.glb`, depois `npm run robots:models`.
+- **Cenário menos carregado (16/11/2026):**
+  - o prado em volta da arena ficou limpo: samambaias, arbustos, cogumelos e flores foram para a borda da floresta (a partir de 8 a 15 m), em touceiras;
+  - pinheiros em bosques espaçados entre 20 e 34 m e uma faixa contínua ao fundo (38 a 62 m), que com a neblina fecha o horizonte. No Alto: 280 árvores (antes 750), 70 samambaias (220), 40 arbustos (140), 21 cogumelos (70) e 120 flores (320);
+  - texturas novas, geradas no código e sem emenda: grama com folhinhas em vários tons, manchas e pontos de terra (também usada como relevo); agulhas nos pinheiros e casca nos troncos; pinheiros e arbustos com sombreamento suave em vez de facetas;
+  - custo no Alto: 5,5 a 6,5 ms por quadro (antes cerca de 7 ms).
