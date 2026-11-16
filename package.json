@@ -18,6 +18,7 @@
     "field:parts": "node scripts/arena-parts.mjs cad/arena cad/arena-parts",
     "field:models": "blender -b --python scripts/blender/build_field.py -- cad/arena-parts public/models/field",
     "sounds:ftclive": "node scripts/ftclive-sounds.mjs",
+    "venue:model": "blender -b --python scripts/blender/build_venue.py -- public/models/venue",
     "robots:models": "blender -b --python scripts/blender/build_robots.py -- cad/robots public/models/robots"
   },
   "dependencies": {

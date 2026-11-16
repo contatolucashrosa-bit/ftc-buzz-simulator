@@ -1,36 +1,19 @@
 // Buzz Simulator — Criado por Lucas Hochmann Rosa (https://github.com/contatolucashrosa-bit), em parceria com WestSharksFTC #24823.
-// Cenário da temporada: a arena num prado aberto, cercado por colinas, bosques e uma faixa de pinheiros ao fundo,
-// com samambaias, flores silvestres e cogumelos. As equipes são apicultores de macacão inteiro (rosa na
-// aliança vermelha, lavanda na azul). Tudo é gerado no código (low-poly, sem assets de terceiros), inspirado
-// no clima do vídeo de divulgação da BIOBUZZ, sem copiar modelos.
-// A quantidade de objetos depende do preset de qualidade, para rodar em computadores escolares.
+// Cenário: a arena num galpão industrial (src/render/venue.ts, modelado no Blender), com a plateia na arquibancada
+// no preset Alto. Nas ALLIANCE AREAS ficam as equipes, apicultores de macacão inteiro (rosa na aliança vermelha,
+// lavanda na azul), gerados no código e animados (HUMAN PLAYER entrega o NECTAR, comemoração no TIP).
 import * as THREE from "three";
-import { mergeGeometries } from "three/examples/jsm/utils/BufferGeometryUtils.js";
 import type { Quality } from "./stage";
+import { loadVenue, placeholderFloor, type Venue } from "./venue";
 
 type Alliance = "red" | "blue";
 const FIELD_HALF_M = 1.83;
 // ALLIANCE AREA (§9.3): 54 × 97 pol, encostada na parede lateral do campo
 const AREA = { inner: FIELD_HALF_M + 0.05, outer: FIELD_HALF_M + 0.05 + 54 * 0.0254, halfDepth: (97 * 0.0254) / 2 };
-const SKY_TOP = new THREE.Color(0x6f8fa6);
-const SKY_HORIZON = new THREE.Color(0x8d9c94);
-/** Neblina esverdeada: a floresta ao longe vira uma parede escura e suave, como no vídeo. */
-const HAZE = 0x5c6e60;
-
 /** Macacões das equipes: cor do tecido, chapéu e luvas/botas por aliança. */
 const SUIT: Record<Alliance, { cloth: number; hat: number; trim: number }> = {
   red: { cloth: 0xd77f8c, hat: 0xc9506a, trim: 0xb8405c },
   blue: { cloth: 0xa4a9dc, hat: 0x7f85d6, trim: 0x6f75c8 },
-};
-
-/**
- * Quantidades por preset. O prado em volta da arena fica limpo; a vegetação se concentra na borda da floresta,
- * em bosques, e numa faixa contínua de pinheiros ao fundo, que fecha o horizonte.
- */
-const DETAIL: Record<Quality, { trees: number; ferns: number; bushes: number; mushrooms: number; flowers: number; grassDetail: boolean }> = {
-  low: { trees: 150, ferns: 0, bushes: 14, mushrooms: 6, flowers: 40, grassDetail: false },
-  medium: { trees: 230, ferns: 45, bushes: 30, mushrooms: 15, flowers: 90, grassDetail: true },
-  high: { trees: 280, ferns: 70, bushes: 40, mushrooms: 21, flowers: 120, grassDetail: true },
 };
 
 /** Gerador pseudoaleatório com semente: o cenário é sempre igual (bom para replays e capturas). */
@@ -47,339 +30,6 @@ function seeded(seed: number): () => number {
 
 const lambert = (color: number, extra: THREE.MeshLambertMaterialParameters = {}) => new THREE.MeshLambertMaterial({ color, ...extra });
 
-function instanced(geometry: THREE.BufferGeometry, material: THREE.Material, transforms: THREE.Matrix4[], colors?: THREE.Color[], shadows = false): THREE.InstancedMesh {
-  const mesh = new THREE.InstancedMesh(geometry, material, Math.max(1, transforms.length));
-  mesh.count = transforms.length;
-  transforms.forEach((m, i) => mesh.setMatrixAt(i, m));
-  if (colors) colors.forEach((c, i) => mesh.setColorAt(i, c));
-  mesh.instanceMatrix.needsUpdate = true;
-  mesh.castShadow = shadows;
-  return mesh;
-}
-
-const yawQ = (a: number) => new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(0, 1, 0), a);
-
-// ---------- céu e terreno ----------
-
-function skyDome(): THREE.Mesh {
-  const geometry = new THREE.SphereGeometry(90, 32, 16);
-  const colors: number[] = [];
-  const pos = geometry.attributes.position;
-  const c = new THREE.Color();
-  for (let i = 0; i < pos.count; i++) {
-    const t = Math.max(0, pos.getY(i) / 90);
-    c.copy(SKY_HORIZON).lerp(SKY_TOP, Math.pow(t, 0.6));
-    colors.push(c.r, c.g, c.b);
-  }
-  geometry.setAttribute("color", new THREE.Float32BufferAttribute(colors, 3));
-  const sky = new THREE.Mesh(geometry, new THREE.MeshBasicMaterial({ vertexColors: true, side: THREE.BackSide, fog: false, depthWrite: false }));
-  sky.renderOrder = -1;
-  return sky;
-}
-
-/**
- * Altura do terreno (m): plano onde ficam a arena e as ALLIANCE AREAS, subindo em colinas suaves
- * a partir de ~9 m, até virar uma encosta atrás da floresta (fecha o horizonte, como no vídeo).
- */
-export function terrainHeight(x: number, z: number): number {
-  const r = Math.hypot(x, z);
-  const t = Math.min(1, Math.max(0, (r - 9) / 14));
-  const ramp = t * t * (3 - 2 * t);
-  const hills = 1.2 + Math.sin(x * 0.11) * Math.cos(z * 0.09) * 1.4 + Math.sin((x - z) * 0.05) * 1.1;
-  return ramp * hills + Math.max(0, r - 26) * 0.32;
-}
-
-/** Desenha numa textura quadrada que se repete sem emenda (cada traço é repetido nas bordas). */
-function tileTexture(size: number, draw: (ctx: CanvasRenderingContext2D, wrap: (fn: (dx: number, dy: number) => void) => void) => void): THREE.CanvasTexture {
-  const canvas = document.createElement("canvas");
-  canvas.width = canvas.height = size;
-  const ctx = canvas.getContext("2d")!;
-  const wrap = (fn: (dx: number, dy: number) => void) => {
-    for (const dx of [-size, 0, size]) for (const dy of [-size, 0, size]) fn(dx, dy);
-  };
-  draw(ctx, wrap);
-  const texture = new THREE.CanvasTexture(canvas);
-  texture.colorSpace = THREE.SRGBColorSpace;
-  texture.wrapS = texture.wrapT = THREE.RepeatWrapping;
-  texture.anisotropy = 8;
-  return texture;
-}
-
-/**
- * Grama vista de perto: base em manchas suaves, milhares de folhinhas em vários tons e alguns pontos de terra.
- * Os tons ficam claros (0,6 a 1): a textura multiplica a cor do terreno, que dá as manchas grandes.
- */
-function grassTexture(rand: () => number): THREE.CanvasTexture {
-  const texture = tileTexture(512, (ctx, wrap) => {
-    ctx.fillStyle = "rgb(205,215,190)";
-    ctx.fillRect(0, 0, 512, 512);
-    // manchas suaves
-    for (let i = 0; i < 90; i++) {
-      const x = rand() * 512;
-      const y = rand() * 512;
-      const r = 20 + rand() * 60;
-      const light = rand() > 0.5;
-      wrap((dx, dy) => {
-        const g = ctx.createRadialGradient(x + dx, y + dy, 0, x + dx, y + dy, r);
-        g.addColorStop(0, light ? "rgba(235,240,205,0.35)" : "rgba(150,170,130,0.3)");
-        g.addColorStop(1, "rgba(0,0,0,0)");
-        ctx.fillStyle = g;
-        ctx.fillRect(x + dx - r, y + dy - r, r * 2, r * 2);
-      });
-    }
-    // pontinhos de terra
-    for (let i = 0; i < 260; i++) {
-      const x = rand() * 512;
-      const y = rand() * 512;
-      ctx.fillStyle = `rgba(${150 + rand() * 30},${130 + rand() * 20},${95 + rand() * 20},0.55)`;
-      ctx.fillRect(x, y, 1 + rand() * 2, 1 + rand() * 2);
-    }
-    // folhinhas: traços curtos e inclinados, do escuro ao claro
-    ctx.lineCap = "round";
-    for (let i = 0; i < 16000; i++) {
-      const x = rand() * 512;
-      const y = rand() * 512;
-      const len = 3 + rand() * 7;
-      const lean = (rand() - 0.5) * 0.9;
-      const v = rand();
-      ctx.strokeStyle = `rgb(${Math.round(150 + v * 90)},${Math.round(175 + v * 80)},${Math.round(120 + v * 70)})`;
-      ctx.lineWidth = 0.8 + rand() * 0.9;
-      wrap((dx, dy) => {
-        if (x + dx < -12 || x + dx > 524 || y + dy < -12 || y + dy > 524) return;
-        ctx.beginPath();
-        ctx.moveTo(x + dx, y + dy);
-        ctx.lineTo(x + dx + Math.sin(lean) * len, y + dy - Math.cos(lean) * len);
-        ctx.stroke();
-      });
-    }
-  });
-  texture.repeat.set(48, 48);
-  return texture;
-}
-
-/** Agulhas de pinheiro (envolvem os cones): faixas verticais irregulares, claras sobre o tom da árvore. */
-function needleTexture(rand: () => number): THREE.CanvasTexture {
-  const texture = tileTexture(128, (ctx, wrap) => {
-    ctx.fillStyle = "rgb(150,160,145)";
-    ctx.fillRect(0, 0, 128, 128);
-    for (let i = 0; i < 900; i++) {
-      const x = rand() * 128;
-      const y = rand() * 128;
-      const v = rand();
-      ctx.strokeStyle = `rgba(${Math.round(190 + v * 65)},${Math.round(205 + v * 50)},${Math.round(180 + v * 60)},0.8)`;
-      ctx.lineWidth = 1;
-      const len = 4 + rand() * 6;
-      wrap((dx, dy) => {
-        ctx.beginPath();
-        ctx.moveTo(x + dx, y + dy);
-        ctx.lineTo(x + dx + (rand() - 0.5) * 3, y + dy + len);
-        ctx.stroke();
-      });
-    }
-  });
-  texture.repeat.set(4, 2);
-  return texture;
-}
-
-/** Casca: sulcos verticais escuros sobre o marrom. */
-function barkTexture(rand: () => number): THREE.CanvasTexture {
-  const texture = tileTexture(64, (ctx, wrap) => {
-    ctx.fillStyle = "rgb(225,215,205)";
-    ctx.fillRect(0, 0, 64, 64);
-    for (let i = 0; i < 70; i++) {
-      const x = rand() * 64;
-      const y = rand() * 64;
-      ctx.strokeStyle = `rgba(90,70,55,${0.4 + rand() * 0.4})`;
-      ctx.lineWidth = 1 + rand() * 1.5;
-      const len = 8 + rand() * 20;
-      wrap((dx, dy) => {
-        ctx.beginPath();
-        ctx.moveTo(x + dx, y + dy);
-        ctx.lineTo(x + dx + (rand() - 0.5) * 2, y + dy + len);
-        ctx.stroke();
-      });
-    }
-  });
-  texture.repeat.set(2, 2);
-  return texture;
-}
-
-function terrain(rand: () => number, detail: boolean): THREE.Mesh {
-  const size = 150;
-  const geometry = new THREE.PlaneGeometry(size, size, 120, 120);
-  geometry.rotateX(-Math.PI / 2);
-  const colors: number[] = [];
-  const meadow = new THREE.Color(0x2a4d1f);
-  const shade = new THREE.Color(0x173314);
-  const c = new THREE.Color();
-  const pos = geometry.attributes.position;
-  for (let i = 0; i < pos.count; i++) {
-    const x = pos.getX(i);
-    const z = pos.getZ(i);
-    pos.setY(i, terrainHeight(x, z) - 0.006);
-    // manchas de grama mais escura e mais clara, e o chão da floresta mais sombreado
-    const patch = Math.sin(x * 0.7 + Math.cos(z * 0.5)) * Math.cos(z * 0.6 - x * 0.2);
-    const forestShade = Math.min(1, Math.max(0, (Math.hypot(x, z) - 15) / 10));
-    c.copy(meadow).lerp(shade, 0.25 + patch * 0.2 + forestShade * 0.55).offsetHSL((rand() - 0.5) * 0.015, 0, (rand() - 0.5) * 0.03);
-    colors.push(c.r, c.g, c.b);
-  }
-  geometry.setAttribute("color", new THREE.Float32BufferAttribute(colors, 3));
-  geometry.computeVertexNormals();
-  const grass = detail ? grassTexture(rand) : null;
-  // a mesma textura dá o relevo das folhinhas
-  const material = new THREE.MeshLambertMaterial({ vertexColors: true, map: grass, bumpMap: grass, bumpScale: 0.6 });
-  const mesh = new THREE.Mesh(geometry, material);
-  mesh.receiveShadow = true;
-  return mesh;
-}
-
-/** Pontos num anel ao redor da arena, com a altura do terreno. `avoid`: raio livre perto das câmeras e das equipes. */
-function scatter(count: number, rMin: number, rMax: number, rand: () => number, avoidArena = true): THREE.Vector3[] {
-  const points: THREE.Vector3[] = [];
-  let guard = 0;
-  while (points.length < count && guard++ < count * 40) {
-    const a = rand() * Math.PI * 2;
-    const r = rMin + Math.sqrt(rand()) * (rMax - rMin);
-    const x = Math.cos(a) * r;
-    const z = Math.sin(a) * r;
-    // arena + ALLIANCE AREAS + espaço das câmeras da plateia (z > 0) e dos pilotos (|x| grande)
-    if (avoidArena && Math.abs(x) < AREA.outer + 1.2 && Math.abs(z) < AREA.halfDepth + 1.4) continue;
-    if (avoidArena && z > 2 && z < 6 && Math.abs(x) < 3) continue;
-    points.push(new THREE.Vector3(x, terrainHeight(x, z), z));
-  }
-  return points;
-}
-
-// ---------- natureza ----------
-
-/** Pontos agrupados em bosques: `groves` centros no anel, árvores espalhadas em volta de cada um. */
-function groves(count: number, groves: number, rMin: number, rMax: number, spread: number, rand: () => number): THREE.Vector3[] {
-  const centers = scatter(groves, rMin, rMax, rand);
-  const points: THREE.Vector3[] = [];
-  for (let i = 0; points.length < count && i < count * 6; i++) {
-    const c = centers[i % centers.length];
-    const a = rand() * Math.PI * 2;
-    const r = Math.sqrt(rand()) * spread;
-    const x = c.x + Math.cos(a) * r;
-    const z = c.z + Math.sin(a) * r;
-    if (Math.hypot(x, z) < rMin - 2) continue;
-    points.push(new THREE.Vector3(x, terrainHeight(x, z), z));
-  }
-  return points;
-}
-
-/**
- * Pinheiros: bosques espaçados na borda do prado e uma faixa contínua ao fundo (com a neblina, vira a "parede"
- * verde do vídeo). Os cones têm textura de agulhas e sombreamento suave, em vez de facetas.
- */
-function forest(count: number, rand: () => number, textured: boolean): THREE.Group {
-  const group = new THREE.Group();
-  const trunkGeo = new THREE.CylinderGeometry(0.1, 0.18, 1.4, 7).translate(0, 0.7, 0);
-  const pineGeo = mergeGeometries([
-    new THREE.ConeGeometry(1.15, 2.4, 12, 2).translate(0, 2.0, 0),
-    new THREE.ConeGeometry(0.95, 2.1, 12, 2).translate(0, 3.1, 0),
-    new THREE.ConeGeometry(0.7, 1.8, 12, 2).translate(0, 4.1, 0),
-    new THREE.ConeGeometry(0.42, 1.4, 10, 1).translate(0, 5.0, 0),
-  ])!;
-  const trunks: THREE.Matrix4[] = [];
-  const pines: THREE.Matrix4[] = [];
-  const colors: THREE.Color[] = [];
-  const place = (p: THREE.Vector3) => {
-    const s = 1.1 + rand() * 1.3;
-    const m = new THREE.Matrix4().compose(p, yawQ(rand() * 6), new THREE.Vector3(s, s * (1.05 + rand() * 0.5), s));
-    trunks.push(m);
-    pines.push(m);
-    colors.push(new THREE.Color().setHSL(0.34 + rand() * 0.06, 0.45 + rand() * 0.15, 0.05 + rand() * 0.035));
-  };
-  const near = Math.round(count * 0.35);
-  for (const p of groves(near, Math.max(4, Math.round(near / 7)), 20, 34, 4.5, rand)) place(p);
-  for (const p of scatter(count - near, 38, 62, rand)) place(p);
-  group.add(instanced(trunkGeo, lambert(0x4a3524, { map: textured ? barkTexture(rand) : null }), trunks));
-  group.add(instanced(pineGeo, lambert(0xffffff, { map: textured ? needleTexture(rand) : null }), pines, colors));
-  return group;
-}
-
-/** Samambaias: folhas finas em leque, arqueadas para fora. */
-function ferns(count: number, rand: () => number): THREE.Object3D {
-  if (!count) return new THREE.Group();
-  const fronds: THREE.BufferGeometry[] = [];
-  for (let i = 0; i < 7; i++) {
-    const leaf = new THREE.ConeGeometry(0.07, 0.62, 4, 1).scale(1, 1, 0.18).translate(0, 0.31, 0);
-    leaf.rotateX(0.95 + (i % 2) * 0.15);
-    leaf.rotateY((i / 7) * Math.PI * 2);
-    fronds.push(leaf);
-  }
-  const geometry = mergeGeometries(fronds)!;
-  const transforms: THREE.Matrix4[] = [];
-  const colors: THREE.Color[] = [];
-  for (const p of groves(count, Math.max(3, Math.round(count / 6)), 13, 22, 2.5, rand)) {
-    const s = 0.45 + rand() * 0.5;
-    transforms.push(new THREE.Matrix4().compose(p, yawQ(rand() * 6), new THREE.Vector3(s, s, s)));
-    colors.push(new THREE.Color().setHSL(0.28 + rand() * 0.05, 0.6, 0.06 + rand() * 0.03));
-  }
-  return instanced(geometry, lambert(0xffffff, { side: THREE.DoubleSide, flatShading: true }), transforms, colors);
-}
-
-function bushes(count: number, rand: () => number): THREE.Object3D {
-  if (!count) return new THREE.Group();
-  const geometry = mergeGeometries([new THREE.IcosahedronGeometry(0.42, 1).translate(0, 0.28, 0), new THREE.IcosahedronGeometry(0.3, 1).translate(0.35, 0.2, 0.1)])!;
-  const transforms: THREE.Matrix4[] = [];
-  const colors: THREE.Color[] = [];
-  for (const p of groves(count, Math.max(3, Math.round(count / 4)), 15, 26, 3, rand)) {
-    transforms.push(new THREE.Matrix4().compose(p, yawQ(rand() * 6), new THREE.Vector3(1, 0.8 + rand() * 0.5, 1).multiplyScalar(0.7 + rand() * 0.8)));
-    colors.push(new THREE.Color().setHSL(0.3 + rand() * 0.04, 0.55, 0.05 + rand() * 0.025));
-  }
-  return instanced(geometry, lambert(0xffffff), transforms, colors);
-}
-
-/** Cogumelos de chapéu vermelho em grupinhos. */
-function mushrooms(count: number, rand: () => number): THREE.Group {
-  const group = new THREE.Group();
-  if (!count) return group;
-  const stemGeo = new THREE.CylinderGeometry(0.035, 0.05, 0.24, 7).translate(0, 0.12, 0);
-  const capGeo = mergeGeometries([
-    new THREE.SphereGeometry(0.15, 12, 6, 0, Math.PI * 2, 0, Math.PI / 2).scale(1, 0.75, 1).translate(0, 0.22, 0),
-    new THREE.CircleGeometry(0.15, 12).rotateX(Math.PI / 2).translate(0, 0.22, 0),
-  ])!;
-  const transforms: THREE.Matrix4[] = [];
-  for (const center of scatter(Math.ceil(count / 3), 12, 20, rand)) {
-    for (let i = 0; i < 3; i++) {
-      const s = 0.6 + rand() * 1.0;
-      const x = center.x + (rand() - 0.5) * 0.5;
-      const z = center.z + (rand() - 0.5) * 0.5;
-      transforms.push(new THREE.Matrix4().compose(new THREE.Vector3(x, terrainHeight(x, z), z), yawQ(rand() * 6), new THREE.Vector3(s, s, s)));
-    }
-  }
-  group.add(instanced(stemGeo, lambert(0xf3eee2), transforms));
-  group.add(instanced(capGeo, lambert(0xd3262c, { side: THREE.DoubleSide }), transforms));
-  return group;
-}
-
-/** Flores silvestres em touceiras: roxas, azuis, brancas e amarelas. */
-function wildflowers(count: number, rand: () => number): THREE.Group {
-  const group = new THREE.Group();
-  if (!count) return group;
-  const stemGeo = new THREE.CylinderGeometry(0.007, 0.009, 0.3, 4).translate(0, 0.15, 0);
-  const headGeo = mergeGeometries([
-    new THREE.CircleGeometry(0.045, 6).rotateX(-Math.PI / 2.3).translate(0, 0.31, 0),
-    new THREE.SphereGeometry(0.018, 6, 4).translate(0, 0.315, 0.004),
-  ])!;
-  const transforms: THREE.Matrix4[] = [];
-  const colors: THREE.Color[] = [];
-  const palette = [0x8a6fd6, 0x5a7fe0, 0xffffff, 0xf2d43a, 0xd65ca8];
-  for (const center of scatter(Math.ceil(count / 8), 8, 20, rand)) {
-    const c = palette[Math.floor(rand() * palette.length)];
-    for (let i = 0; i < 8; i++) {
-      const x = center.x + (rand() - 0.5) * 1.2;
-      const z = center.z + (rand() - 0.5) * 1.2;
-      transforms.push(new THREE.Matrix4().compose(new THREE.Vector3(x, terrainHeight(x, z), z), yawQ(rand() * 6), new THREE.Vector3(1, 0.7 + rand() * 0.8, 1)));
-      colors.push(new THREE.Color(c));
-    }
-  }
-  group.add(instanced(stemGeo, lambert(0x2f6b2a), transforms));
-  group.add(instanced(headGeo, lambert(0xffffff, { side: THREE.DoubleSide }), transforms, colors));
-  return group;
-}
 
 // ---------- equipes: apicultores ----------
 
@@ -483,16 +133,23 @@ export class Environment {
   private readonly people: Record<Alliance, AnimatedPerson[]> = { red: [], blue: [] };
   private readonly delivery = {} as Record<Alliance, Delivery>;
   private time = 0;
+  private venue: Venue | null = null;
   private readonly cheering: Record<Alliance, number> = { red: 0, blue: 0 };
 
   constructor(scene: THREE.Scene, quality: Quality) {
-    const detail = DETAIL[quality];
     const rand = seeded(24823);
 
-    scene.background = SKY_HORIZON.clone();
-    scene.fog = new THREE.Fog(HAZE, 15, quality === "low" ? 55 : 75);
-    this.group.add(skyDome(), terrain(rand, detail.grassDetail));
-    this.group.add(forest(detail.trees, rand, detail.grassDetail), ferns(detail.ferns, rand), bushes(detail.bushes, rand), mushrooms(detail.mushrooms, rand), wildflowers(detail.flowers, rand));
+    // galpão industrial: fundo cinza-escuro e uma névoa leve que suaviza o fundo do galpão
+    scene.background = new THREE.Color(0x2b2e33);
+    scene.fog = new THREE.Fog(0x3a3e44, 24, 60);
+    const floor = placeholderFloor();
+    this.group.add(floor);
+    void loadVenue(quality === "high").then((venue) => {
+      if (!venue) return;
+      this.group.remove(floor);
+      this.group.add(venue.root);
+      this.venue = venue;
+    });
 
     // ALLIANCE AREAS: 2 HUMAN PLAYERS perto da LOADING ZONE, 2 pilotos e 1 técnico por aliança
     for (const alliance of ["red", "blue"] as const) {
@@ -659,6 +316,7 @@ export class Environment {
   /** `camera`: posição da câmera; quem estiver colado a ela some, para não tapar a tela (câmera do robô). */
   update(dt: number, camera?: THREE.Vector3): void {
     this.time += dt;
+    this.venue?.update(this.time, Math.max(this.cheering.red, this.cheering.blue));
     for (const alliance of ["red", "blue"] as const) {
       this.cheering[alliance] = Math.max(0, this.cheering[alliance] - dt);
       for (const p of this.people[alliance]) {
