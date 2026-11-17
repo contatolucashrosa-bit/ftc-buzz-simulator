@@ -10,7 +10,7 @@ import { showSplash } from "./ui/splash";
 
 new App(document.getElementById("app")!).start();
 // abertura (uma vez por sessão); as capturas automáticas do modo de desenvolvimento pulam
-if (!new URLSearchParams(location.search).has("autoplay")) showSplash();
+if (!(import.meta.env.DEV && new URLSearchParams(location.search).has("autoplay"))) showSplash();
 
 // Modo offline (PWA): guarda o app neste aparelho depois do primeiro acesso. Só no build de produção,
 // para não atrapalhar o recarregamento automático do servidor de desenvolvimento.
