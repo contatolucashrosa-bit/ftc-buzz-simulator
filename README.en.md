@@ -74,8 +74,9 @@ The source of truth for the rules is the official *BIOBUZZ Competition Manual*, 
 - **AprilTag vision:** the SDK's `VisionPortal` and `AprilTagProcessor` work with the robot's simulated camera. Tags 30–45 sit under the CELLS and follow the HIVE's tilt; `ftcPose`, `robotPose` and `metadata` come out as on the real robot.
 - **CAD Workshop:** imports GLB, STL and STEP (up to 40 MB in the browser), orients the model, checks R102 and stores it on the device.
 - **Team robots:** export and import robots as `.buzzrobot.zip`, with model, measurements, mechanisms and credit.
-- Recreated **Score Overlay**, animated scoreboard, results screen, **replay** of the last 30 s and an exportable local **ranking**.
-- **Industrial warehouse** modeled in Blender: concrete floor, corrugated steel, steel frame, containers, mezzanine and bleachers with an audience (High preset). DRIVE TEAMS and HUMAN PLAYERS as beekeepers in full suits (pink for red, lavender for blue), plus synthesized **sounds**.
+- **Broadcast scoreboard** laid out like the event audience display, with *Broadcast*, *Large timer*, *Driver* and *Hidden* modes, a 3-2-1 countdown before the start, an animated result, **replay** of the last 30 s and an exportable local **ranking**.
+- **Event opening screen** when the site loads and a **compact in-match interface**: icon toolbar in the corner, controls and robot panel collapsed, resizable scoreboard.
+- **Industrial warehouse** modeled in Blender: concrete floor, corrugated steel, steel frame, containers, mezzanine and bleachers with an audience (High preset). DRIVE TEAMS and HUMAN PLAYERS as beekeepers in full suits (pink for red, lavender for blue), plus synthesized **sounds**. If you have FTC Live installed, `npm run sounds:ftclive` swaps them for the official match sounds (local copy, kept out of the repository).
 - **Arena built from the official CAD parts** (Medium and High presets): HIVE, frame and FLOWERS assembled in Blender from the AndyMark CAD, with the frame collision on the real geometry. The models are generated locally (`npm run field:parts` and `npm run field:models`, see `docs/visual-plan.md`) and stay out of the repository; without them, the game uses the parts generated in code.
 - **Starter bots with the official CAD** as their visual (Medium and High), generated locally with `npm run robots:models`, and a **pause** menu: free in solo play and limited to 30 s per alliance with two players.
 - **Arena in the video and CAD colors:** light-gray TILES, polycarbonate perimeter with black rails, green FLOWERS with yellow tops and HIVE CELLS framed in the alliance color.
@@ -98,8 +99,8 @@ The source of truth for the rules is the official *BIOBUZZ Competition Manual*, 
 - [Running](#️-running)
 - [Deploy and offline use](#-deploy-and-offline-use)
 - [Notices](#️-notices)
-- [License](#-license)
 - [Author](#‍-author)
+- [License](#-license)
 
 ---
 
@@ -113,8 +114,10 @@ ftc-buzz-simulator/
 ├── data/rules/biobuzz-tu07.json    # manual rules as data, with the cited page
 ├── docs/                           # analysis, roadmap, CAD, Java, bots and starter bots
 ├── examples/TeamCode/              # sample OpModes to import in the Workshop
-├── public/                         # icon and manifest for the installable app
+├── .github/workflows/deploy.yml    # clean build and GitHub Pages publishing
+├── public/                         # icon, manifest, images and the warehouse (models/venue)
 ├── scripts/                        # STEP → GLB converter, Java libs build and offline plugin
+│   └── blender/                    # warehouse, arena and starter bots built in Blender
 ├── vendor/java-libs/               # in-browser Java compiler and simulated FTC SDK (jar)
 └── src/
     ├── rules/      # typed reading of the rules file
@@ -170,7 +173,9 @@ The scoring engine does not depend on 3D: it takes a "snapshot" of the match and
 
 **CAD:** `occt-import-js` (OpenCascade in WebAssembly) and `meshoptimizer`.
 
-**Audio:** Web Audio API, with no sound files.
+**Audio:** Web Audio API, with sounds synthesized in code (FTC Live sounds are optional and local only).
+
+**Modeling:** Blender 5 from the command line, for the warehouse, the arena and the starter bots.
 
 **Font:** bundled Roboto, *FIRST*'s official font, which works offline.
 
@@ -198,7 +203,7 @@ On the **Play** screen the team picks its number, event, robot, AUTO program (sa
 | Launcher speed / angle | ↑ ↓ / ← → | D-pad |
 | HUMAN PLAYER: introduce NECTAR | N | Y |
 | Camera · drive mode · restart · pause | C · O · R · Esc | Back · — · — · Start |
-| Scoreboard: broadcast → driver → hidden | V | — |
+| Scoreboard: broadcast → large timer → driver → hidden | V | — |
 | "Follow robot" camera: orbit / tilt / zoom | drag the mouse / wheel / double click resets | right stick ↕ tilts; R3 + ↔ orbits |
 
 **Second player controls:** I/K drive, J/L turn, H intake, Y launch (automatic aim at the upper CELL), U uses the FLOWER. Or a second connected gamepad. With a second player and a Java TeleOp, gamepad1's keyboard A/B/X/Y buttons move to 1/2/3/4, and LB/RB to Z/X.
@@ -247,14 +252,22 @@ This project uses no environment variables. The application runs entirely in the
 | `npm run preview` | Serves `dist/` locally for checking |
 | `npm run cad:convert -- robot.step robot.glb` | Converts a large robot STEP into GLB for the Workshop |
 | `npm run java:libs` | Rebuilds the simulated FTC SDK and Pedro Pathing |
+| `npm run venue:model` | Rebuilds the warehouse in Blender (`public/models/venue`) |
+| `npm run field:parts` and `npm run field:models` | Builds the arena from the official CAD in `cad/arena` (local, kept out of git) |
+| `npm run robots:models` | Builds the starter bots from the CADs in `cad/robots` (local, kept out of git) |
+| `npm run sounds:ftclive` | Copies the installed FTC Live sounds into `public/sounds/ftclive` (local, kept out of git) |
 
 ---
 
 ## 🌐 Deploy and offline use
 
-The contents of `dist/` are a static site and can be published on any free host, such as GitHub Pages.
+The contents of `dist/` are a static site and can be published on any free host.
 
-**Offline (PWA):** on the first visit, the service worker stores the app on the device (about 21 MB, including the Java compiler). After that, Buzz Simulator opens and plays without internet, and the browser offers "Install app". The in-browser STEP reader (7.6 MB) is stored the first time it is used.
+**GitHub Pages:** the `.github/workflows/deploy.yml` workflow runs the tests, builds and publishes on every push to `main`. To enable it, pick *GitHub Actions* as the source under *Settings → Pages*. The build runs from a clean checkout, so the official CAD, the manufacturers' starter bots and the FTC Live sounds never reach the site; the game uses its own models and sounds.
+
+> Do not publish a `dist/` built on your machine if you ran `field:models`, `robots:models` or `sounds:ftclive`: those files end up in the local build.
+
+**Offline (PWA):** on the first visit, the service worker stores the app on the device (about 23 MB, including the Java compiler). After that, Buzz Simulator opens and plays without internet, and the browser offers "Install app". The in-browser STEP reader (7.6 MB) is stored the first time it is used.
 
 ---
 
@@ -273,12 +286,6 @@ Detailed documentation (in Portuguese): [roadmap](docs/phase-1-analysis.md) · [
 
 ---
 
-## 📄 License
-
-Licensed under MIT. Feel free to use, modify and distribute it, keeping the copyright notice and crediting **Lucas Hochmann Rosa**.
-
----
-
 ## 👨‍💻 Author
 
 **Lucas Hochmann Rosa**
@@ -289,5 +296,11 @@ Licensed under MIT. Feel free to use, modify and distribute it, keeping the copy
 - E-mail: hrlucas.dev@gmail.com
 
 In partnership with **WestSharksFTC #24823** (SESI SENAI Chapecó).
+
+---
+
+## 📄 License
+
+Licensed under MIT. Feel free to use, modify and distribute it, keeping the copyright notice and crediting **Lucas Hochmann Rosa**.
 
 ---

@@ -315,7 +315,7 @@ export class App {
       <h2>Créditos</h2>
       <p>Criado por <a href="${APP.authorUrl}" target="_blank" rel="noopener">${APP.author}</a>, em parceria com <a href="${APP.partnerUrl}" target="_blank" rel="noopener">${APP.partner}</a> (SESI SENAI Chapecó).</p>
       <h2>Regras</h2>
-      <p>Fonte da verdade: <em>2026-2027 FIRST® Tech Challenge Competition Manual — BIOBUZZ™ presented by RTX</em>, versão ${APP.manualVersion}. Medidas que o manual não informa (como o peso que vira a HIVE) estão marcadas como suposição no arquivo de regras e serão calibradas com o CAD oficial.</p>
+      <p>Fonte da verdade: <em>2026-2027 FIRST® Tech Challenge Competition Manual — BIOBUZZ™ presented by RTX</em>, versão ${APP.manualVersion}. Medidas que o manual não informa (como o peso que vira a HIVE) estão marcadas como suposição no arquivo de regras e podem mudar entre as versões.</p>
       <h2>Independência de plataforma</h2>
       <p>Roda em qualquer navegador moderno com WebGL 2 — Windows, macOS, Linux, Chromebook e tablets — sem instalar nada.</p>
       <h2>Licença</h2>

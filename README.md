@@ -74,8 +74,9 @@ A fonte da verdade das regras é o manual oficial *BIOBUZZ Competition Manual*, 
 - **Visão com AprilTag:** `VisionPortal` e `AprilTagProcessor` do SDK funcionam com a câmera simulada do robô. As tags 30–45 ficam sob as CELLS e acompanham a inclinação da HIVE; `ftcPose`, `robotPose` e `metadata` vêm como no robô real.
 - **Oficina de CAD:** importa GLB, STL e STEP (até 40 MB no navegador), orienta o modelo, confere o R102 e guarda no aparelho.
 - **Robôs da equipe:** exporta e importa robôs como `.buzzrobot.zip`, com modelo, medidas, mecanismos e crédito.
-- **Score Overlay** recriado, placar animado, tela de resultado, **replay** dos últimos 30 s e **ranking** local exportável.
-- **Galpão industrial** modelado no Blender: piso de concreto, chapa ondulada, estrutura de aço, containers, mezanino e arquibancada com plateia (preset Alto). DRIVE TEAMS e HUMAN PLAYERS como apicultores de macacão (rosa na vermelha, lavanda na azul), além de **sons** sintetizados.
+- **Placar de transmissão** no layout da tela de plateia dos eventos, com modos *Transmissão*, *Cronômetro grande*, *Piloto* e *Oculto*, contagem 3-2-1 antes da largada, resultado animado, **replay** dos últimos 30 s e **ranking** local exportável.
+- **Abertura de evento** ao entrar no site e **interface compacta** na partida: barra de ícones no canto, controles e painel do robô recolhidos, placar redimensionável.
+- **Galpão industrial** modelado no Blender: piso de concreto, chapa ondulada, estrutura de aço, containers, mezanino e arquibancada com plateia (preset Alto). DRIVE TEAMS e HUMAN PLAYERS como apicultores de macacão (rosa na vermelha, lavanda na azul), além de **sons** sintetizados. Quem tem o FTC Live instalado pode trocar os sons sintetizados pelos da partida oficial com `npm run sounds:ftclive` (cópia local, fora do repositório).
 - **Arena com as peças do CAD oficial** (presets Médio e Alto): HIVE, estrutura e FLOWERS montadas no Blender a partir do CAD da AndyMark, com a colisão da estrutura na geometria real. Os modelos são gerados localmente (`npm run field:parts` e `npm run field:models`, ver `docs/visual-plan.md`) e ficam fora do repositório; sem eles, o jogo usa as peças geradas no código.
 - **Starter bots com o CAD oficial** como visual (Médio e Alto), gerados localmente com `npm run robots:models`, e **pausa** com menu próprio: livre no jogo solo e limitada a 30 s por aliança com dois jogadores.
 - **Arena nas cores do vídeo e do CAD:** TILES cinza-claro, perímetro de policarbonato com perfis pretos, FLOWERS verdes com topo amarelo e CELLS da HIVE com molduras na cor da aliança.
@@ -98,8 +99,8 @@ A fonte da verdade das regras é o manual oficial *BIOBUZZ Competition Manual*, 
 - [Execução](#️-execução)
 - [Deploy e uso offline](#-deploy-e-uso-offline)
 - [Avisos](#️-avisos)
-- [Licença](#-licença)
 - [Autor](#‍-autor)
+- [Licença](#-licença)
 
 ---
 
@@ -113,8 +114,10 @@ ftc-buzz-simulator/
 ├── data/rules/biobuzz-tu07.json    # regras do manual em dados, com a página citada
 ├── docs/                           # análise, roadmap, CAD, Java, bots e starter bots
 ├── examples/TeamCode/              # OpModes de exemplo para importar na Oficina
-├── public/                         # ícone e manifesto do app instalável
+├── .github/workflows/deploy.yml    # build limpo e publicação no GitHub Pages
+├── public/                         # ícone, manifesto, imagens e o galpão (models/venue)
 ├── scripts/                        # conversor STEP → GLB, build das libs Java e plugin offline
+│   └── blender/                    # galpão, arena e starter bots gerados no Blender
 ├── vendor/java-libs/               # compilador Java do navegador e SDK FTC simulado (jar)
 └── src/
     ├── rules/      # leitura tipada do arquivo de regras
@@ -170,7 +173,9 @@ O motor de pontuação não depende do 3D: recebe um "retrato" da partida e devo
 
 **CAD:** `occt-import-js` (OpenCascade em WebAssembly) e `meshoptimizer`.
 
-**Áudio:** Web Audio API, sem arquivos de som.
+**Áudio:** Web Audio API, com sons sintetizados no código (os sons do FTC Live são opcionais e só locais).
+
+**Modelagem:** Blender 5 em linha de comando, para o galpão, a arena e os starter bots.
 
 **Fonte:** Roboto empacotada, a fonte oficial da *FIRST*, que funciona offline.
 
@@ -198,7 +203,7 @@ Na tela **Jogar** a equipe escolhe número, evento, robô, programa do AUTO (de 
 | Velocidade / ângulo do lançador | ↑ ↓ / ← → | direcional |
 | HUMAN PLAYER: introduzir NECTAR | N | Y |
 | Câmera · direção · reiniciar · pausar | C · O · R · Esc | Back · — · — · Start |
-| Placar: transmissão → piloto → oculto | V | — |
+| Placar: transmissão → cronômetro grande → piloto → oculto | V | — |
 | Câmera "Seguir robô": girar / inclinar / aproximar | arrastar o mouse / roda / duplo clique volta ao padrão | analógico direito ↕ inclina; R3 + ↔ gira |
 
 **Controles do 2º jogador:** I/K anda, J/L gira, H coleta, Y lança (mira automática na CELL de cima), U usa a FLOWER. Ou o 2º controle conectado. Com 2º jogador e TeleOp em Java, os botões A/B/X/Y do gamepad1 no teclado passam para 1/2/3/4, e LB/RB para Z/X.
@@ -247,14 +252,22 @@ Este projeto não usa variáveis de ambiente. A aplicação roda inteiramente no
 | `npm run preview` | Serve o `dist/` localmente para conferência |
 | `npm run cad:convert -- robo.step robo.glb` | Converte um STEP grande de robô em GLB para a Oficina |
 | `npm run java:libs` | Recompila o SDK FTC simulado e o Pedro Pathing |
+| `npm run venue:model` | Regera o galpão no Blender (`public/models/venue`) |
+| `npm run field:parts` e `npm run field:models` | Gera a arena a partir do CAD oficial em `cad/arena` (local, fora do git) |
+| `npm run robots:models` | Gera os starter bots a partir dos CADs em `cad/robots` (local, fora do git) |
+| `npm run sounds:ftclive` | Copia os sons do FTC Live instalado para `public/sounds/ftclive` (local, fora do git) |
 
 ---
 
 ## 🌐 Deploy e uso offline
 
-O conteúdo de `dist/` é um site estático e pode ser publicado em qualquer hospedagem gratuita, como o GitHub Pages.
+O conteúdo de `dist/` é um site estático e pode ser publicado em qualquer hospedagem gratuita.
 
-**Offline (PWA):** no primeiro acesso, o service worker guarda o app no aparelho (cerca de 21 MB, com o compilador Java). Depois disso, o Buzz Simulator abre e joga sem internet, e o navegador oferece "Instalar app". A leitura de STEP no navegador (7,6 MB) é guardada na primeira vez que for usada.
+**GitHub Pages:** o workflow `.github/workflows/deploy.yml` roda os testes, faz o build e publica a cada push na `main`. Para ativar, em *Settings → Pages*, escolha *GitHub Actions* como fonte. O build sai de um checkout limpo, então o CAD oficial, os starter bots dos fabricantes e os sons do FTC Live nunca vão para o site; o jogo usa os modelos e sons próprios.
+
+> Não publique um `dist/` gerado na sua máquina se você rodou `field:models`, `robots:models` ou `sounds:ftclive`: esses arquivos entram no build local.
+
+**Offline (PWA):** no primeiro acesso, o service worker guarda o app no aparelho (cerca de 23 MB, com o compilador Java). Depois disso, o Buzz Simulator abre e joga sem internet, e o navegador oferece "Instalar app". A leitura de STEP no navegador (7,6 MB) é guardada na primeira vez que for usada.
 
 ---
 
@@ -273,12 +286,6 @@ Documentação detalhada: [roadmap](docs/phase-1-analysis.md) · [Java](docs/m5a
 
 ---
 
-## 📄 Licença
-
-Licenciado sob MIT. Sinta-se livre para usar, modificar e distribuir, mantendo o aviso de copyright e atribuindo crédito a **Lucas Hochmann Rosa**.
-
----
-
 ## 👨‍💻 Autor
 
 **Lucas Hochmann Rosa**
@@ -289,5 +296,11 @@ Licenciado sob MIT. Sinta-se livre para usar, modificar e distribuir, mantendo o
 - E-mail: hrlucas.dev@gmail.com
 
 Em parceria com a **WestSharksFTC #24823** (SESI SENAI Chapecó).
+
+---
+
+## 📄 Licença
+
+Licenciado sob MIT. Sinta-se livre para usar, modificar e distribuir, mantendo o aviso de copyright e atribuindo crédito a **Lucas Hochmann Rosa**.
 
 ---

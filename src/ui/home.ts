@@ -25,7 +25,7 @@ export function homeHtml(matchesPlayed: number): string {
         </ul>
       </div>
       <figure class="home-hero-shot">
-        <img src="${IMG}/arena-driver.jpg" width="1280" height="720" alt="Arena do BIOBUZZ no simulador: HIVE com as CELLS vermelhas e azuis, FLOWERS verdes e robôs no campo, num prado cercado de floresta">
+        <img src="${IMG}/arena-driver.jpg" width="1280" height="720" alt="Arena do BIOBUZZ no simulador: HIVE com as CELLS vermelhas e azuis, FLOWERS verdes e robôs no campo, dentro de um galpão com arquibancada e plateia">
       </figure>
     </section>
 
@@ -61,7 +61,7 @@ export function homeHtml(matchesPlayed: number): string {
     </section>
 
     <section class="season">
-      <figure><img src="${IMG}/arena-audience.jpg" width="1280" height="720" loading="lazy" alt="Vista da plateia: equipes de apicultores rosa e lavanda dos dois lados da arena"></figure>
+      <figure><img src="${IMG}/arena-audience.jpg" width="1280" height="720" loading="lazy" alt="Vista da plateia: equipes de apicultores rosa e lavanda dos dois lados da arena, no piso de concreto do galpão"></figure>
       <div>
         <h2>O desafio BIOBUZZ</h2>
         <p>Na temporada de biodiversidade, os robôs fazem o papel de polinizadores. Eles coletam POLLEN do chão e lançam na HIVE da aliança até ela virar (TIP). Também empilham elementos nas FLOWERS para dominá-las, e o HUMAN PLAYER entra com o NECTAR.</p>
