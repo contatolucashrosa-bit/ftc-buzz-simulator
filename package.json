@@ -1,7 +1,7 @@
 {
   "name": "ftc-buzz-simulator",
   "private": true,
-  "version": "0.4.0",
+  "version": "0.5.0",
   "description": "Buzz Simulator — simulador de FTC BIOBUZZ no navegador, offline e gratuito.",
   "author": "Lucas Hochmann Rosa (https://github.com/contatolucashrosa-bit)",
   "license": "MIT",

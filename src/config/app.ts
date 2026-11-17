@@ -7,7 +7,7 @@ import type { RobotPresetId } from "./robotPresets";
 
 export const APP = {
   name: "Buzz Simulator",
-  version: "0.4.0",
+  version: "0.5.0",
   tagline: "Projete, programe e jogue FTC — direto do navegador.",
   author: "Lucas Hochmann Rosa",
   authorUrl: "https://github.com/contatolucashrosa-bit",
