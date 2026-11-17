@@ -22,6 +22,8 @@ export const CAMERA_LABELS: Record<CameraMode, string> = {
 
 /** Campo de visão por câmera: a do piloto é mais aberta para caber a HIVE (65,6 pol de altura) e o campo perto. */
 const CAMERA_FOV: Record<CameraMode, number> = { audience: 40, driver: 62, follow: 60, top: 50, free: 50 };
+/** Afastamento máximo nas telas em pé: mantém a câmera da plateia na frente da arquibancada, dentro do galpão. */
+const MAX_PULLBACK = 1.35;
 
 /** Órbita da câmera "Seguir robô": guinada relativa às costas do robô, inclinação e distância. */
 export interface FollowOrbit {
@@ -65,7 +67,7 @@ export class Stage {
     this.renderer = new THREE.WebGLRenderer({ antialias: q.antialias, powerPreference: "high-performance" });
     this.renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, q.pixelRatio));
     this.renderer.shadowMap.enabled = q.shadows;
-    this.renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+    this.renderer.shadowMap.type = THREE.PCFShadowMap;
     this.renderer.outputColorSpace = THREE.SRGBColorSpace;
     // ACES dá o contraste "de filme" das transmissões: brancos que não estouram e cores mais densas
     this.renderer.toneMapping = THREE.ACESFilmicToneMapping;
@@ -135,9 +137,25 @@ export class Stage {
     if (this.mode !== "free" && this.mode !== "follow") this.applyCamera();
   }
 
-  /** Telas em pé (tablet, celular) precisam de câmera mais afastada para caber o campo inteiro. */
-  private distanceScale(): number {
+  /** Quanto as telas em pé (tablet, celular) precisam "abrir" o enquadramento para caber o campo inteiro. */
+  private fitScale(): number {
     return Math.max(1, 1.45 / Math.max(0.3, this.camera.aspect));
+  }
+
+  /**
+   * Afastamento da câmera nas telas em pé. Só uma parte do ajuste vira distância: afastar tudo tiraria a câmera
+   * de dentro do galpão (a plateia ficaria atrás da parede). O resto abre a lente em fitLens().
+   */
+  private distanceScale(): number {
+    return Math.min(this.fitScale(), MAX_PULLBACK);
+  }
+
+  /** Abre o campo de visão para compensar o afastamento que distanceScale() não fez. */
+  private fitLens(fov: number): number {
+    const extra = this.fitScale() / this.distanceScale();
+    if (extra <= 1) return fov;
+    const half = Math.atan(Math.tan(THREE.MathUtils.degToRad(fov / 2)) * extra);
+    return Math.min(100, THREE.MathUtils.radToDeg(half * 2));
   }
 
   cycleCamera(): CameraMode {
@@ -233,7 +251,7 @@ export class Stage {
 
   private applyCamera(): void {
     this.orbit.enabled = this.mode === "free";
-    this.camera.fov = CAMERA_FOV[this.mode];
+    this.camera.fov = this.mode === "follow" || this.mode === "free" ? CAMERA_FOV[this.mode] : this.fitLens(CAMERA_FOV[this.mode]);
     this.camera.updateProjectionMatrix();
     const sign = this.driverSide === "red" ? -1 : 1;
     if (this.mode === "audience") {
